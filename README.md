@@ -80,11 +80,12 @@ npm run build      # production build in dist/
 
 ## Deploying (GitHub Pages)
 
-1. Merge this branch into `main`.
-2. In the repository, go to **Settings → Pages → Build and deployment → Source: GitHub Actions**.
-3. Every push to `main` then runs `.github/workflows/deploy.yml` (tests, build, deploy). You can also run it by hand from the **Actions** tab.
+The site is published from the **`gh-pages`** branch: https://chezburgar.github.io/RocketLeauge/
 
-The build uses relative paths, so it also works on Netlify, Vercel, Cloudflare Pages, or any static host. Just serve `dist/`.
+- `.github/workflows/deploy.yml` runs the tests, builds, and force-pushes `dist/` to `gh-pages` on every push to `main` (or this branch). You can also run it by hand from the **Actions** tab.
+- If the site ever shows a 404, check **Settings → Pages**: Source should be *Deploy from a branch*, branch `gh-pages`, folder `/ (root)`.
+
+The build uses relative paths, so `dist/` also works on Netlify, Vercel, Cloudflare Pages, or any static host.
 
 ## Project layout
 
