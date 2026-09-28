@@ -1,0 +1,52 @@
+[
+  {
+    "id": "echo-8bit",
+    "name": "Echo Fanfare \u2013 8bit",
+    "file": "audio/anthems/echo-8bit.mp3"
+  },
+  {
+    "id": "echo-charge",
+    "name": "Echo Fanfare \u2013 Charge",
+    "file": "audio/anthems/echo-charge.mp3"
+  },
+  {
+    "id": "echo-crossed-wires",
+    "name": "Echo Fanfare \u2013 Crossed Wires",
+    "file": "audio/anthems/echo-crossed-wires.mp3"
+  },
+  {
+    "id": "echo-flamenco",
+    "name": "Echo Fanfare \u2013 Flamenco",
+    "file": "audio/anthems/echo-flamenco.mp3"
+  },
+  {
+    "id": "echo-knockout",
+    "name": "Echo Fanfare \u2013 Knockout",
+    "file": "audio/anthems/echo-knockout.mp3"
+  },
+  {
+    "id": "echo-slow-jam",
+    "name": "Echo Fanfare \u2013 Slow Jam",
+    "file": "audio/anthems/echo-slow-jam.mp3"
+  },
+  {
+    "id": "echo-summer-splash",
+    "name": "Echo Fanfare \u2013 Summer Splash",
+    "file": "audio/anthems/echo-summer-splash.mp3"
+  },
+  {
+    "id": "echo-swing",
+    "name": "Echo Fanfare \u2013 Swing",
+    "file": "audio/anthems/echo-swing.mp3"
+  },
+  {
+    "id": "echo-teatime",
+    "name": "Echo Fanfare \u2013 Teatime",
+    "file": "audio/anthems/echo-teatime.mp3"
+  },
+  {
+    "id": "echo-the-phantom",
+    "name": "Echo Fanfare \u2013 The Phantom",
+    "file": "audio/anthems/echo-the-phantom.mp3"
+  }
+]
