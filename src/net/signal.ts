@@ -20,15 +20,25 @@ export class Signal {
     this.peerId = peerId;
   }
 
-  connect(): Promise<void> {
+  async connect(): Promise<void> {
+    try {
+      await this.open(false);
+    } catch (e) {
+      // the project may only allow private channels – retry with authorization
+      await this.open(true).catch(() => Promise.reject(e));
+    }
+  }
+
+  private open(priv: boolean): Promise<void> {
     return new Promise((resolve, reject) => {
-      const ch = supabase.channel(`bl-room-${this.room}`, { config: { broadcast: { self: false, ack: false } } });
+      if (this.channel) void supabase.removeChannel(this.channel);
+      const ch = supabase.channel(`bl-room-${this.room}`, { config: { broadcast: { self: false, ack: false }, private: priv } });
       ch.on('broadcast', { event: 'sig' }, ({ payload }) => {
         const m = payload as SigMsg;
         if (m.to !== '*' && m.to !== this.peerId) return;
         for (const h of this.handlers) h(m);
       });
-      const timer = setTimeout(() => reject(new Error('Could not reach the matchmaking server')), 12000);
+      const timer = setTimeout(() => reject(new Error('Could not reach the matchmaking server')), 10000);
       ch.subscribe((status) => {
         if (status === 'SUBSCRIBED') {
           clearTimeout(timer);
@@ -84,10 +94,23 @@ export class Lobby {
     this.key = key;
   }
 
-  connect(): Promise<void> {
-    if (this.channel) return Promise.resolve();
+  async connect(): Promise<void> {
+    if (this.channel) return;
+    try {
+      await this.open(false);
+    } catch (e) {
+      await this.open(true).catch(() => {
+        if (this.channel) void supabase.removeChannel(this.channel);
+        this.channel = null;
+        return Promise.reject(e);
+      });
+    }
+  }
+
+  private open(priv: boolean): Promise<void> {
     return new Promise((resolve, reject) => {
-      const ch = supabase.channel('bl-lobby', { config: { presence: { key: this.key } } });
+      if (this.channel) void supabase.removeChannel(this.channel);
+      const ch = supabase.channel('bl-lobby', { config: { presence: { key: this.key }, private: priv } });
       ch.on('presence', { event: 'sync' }, () => {
         const state = ch.presenceState<RoomInfo>();
         const list: RoomInfo[] = [];
@@ -96,7 +119,7 @@ export class Lobby {
         this.rooms = list;
         this.onChange?.(list);
       });
-      const timer = setTimeout(() => reject(new Error('Could not reach the matchmaking server')), 12000);
+      const timer = setTimeout(() => reject(new Error('Could not reach the matchmaking server')), 10000);
       ch.subscribe((status) => {
         if (status === 'SUBSCRIBED') {
           clearTimeout(timer);
