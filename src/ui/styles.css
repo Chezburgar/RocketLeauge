@@ -312,3 +312,12 @@ input, select { font-family: var(--font); font-weight: 600; }
   .now-playing { display: none; }
   .goal-banner .g { font-size: 80px; }
 }
+@media (max-height: 760px) {
+  .menu-brand { top: 3vh; font-size: 28px; }
+  .menu-brand svg { width: 38px; height: 38px; }
+  .menu-left { gap: 5px; top: 54%; }
+  .menu-item { padding: 6px 18px; font-size: 20px; }
+  .menu-item small { display: none; }
+  .player-card { bottom: 10px; }
+  .now-playing { bottom: 10px; }
+}

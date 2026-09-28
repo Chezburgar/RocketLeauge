@@ -263,10 +263,10 @@ export function buildCar(loadout: Loadout, team: number): CarVisual {
   body.position.y = BODY_Y;
   root.add(body);
 
-  const paint = new THREE.MeshStandardMaterial({ color: primary, metalness: 0.5, roughness: 0.35, flatShading: true });
-  const accentMat = new THREE.MeshStandardMaterial({ color: accent, metalness: 0.35, roughness: 0.4, flatShading: true });
+  const paint = new THREE.MeshStandardMaterial({ color: primary, metalness: 0.3, roughness: 0.42, flatShading: true });
+  const accentMat = new THREE.MeshStandardMaterial({ color: accent, metalness: 0.25, roughness: 0.5, flatShading: true });
   const dark = new THREE.MeshStandardMaterial({ color: 0x15171d, metalness: 0.2, roughness: 0.7, flatShading: true });
-  const glass = new THREE.MeshStandardMaterial({ color: 0x0b1320, metalness: 0.9, roughness: 0.08, flatShading: true });
+  const glass = new THREE.MeshStandardMaterial({ color: 0x0b1320, metalness: 0.6, roughness: 0.15, flatShading: true });
   const headlight = new THREE.MeshBasicMaterial({ color: new THREE.Color(1, 1, 0.95).multiplyScalar(5), toneMapped: false });
   const taillight = new THREE.MeshBasicMaterial({ color: new THREE.Color(1, 0.1, 0.1).multiplyScalar(4), toneMapped: false });
   const glowMat = new THREE.MeshBasicMaterial({ color: accent.clone().multiplyScalar(3.5), toneMapped: false });
