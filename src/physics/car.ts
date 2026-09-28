@@ -427,9 +427,10 @@ export class Car {
       this.airTime = 0;
     } else if (!grounded && jumpPressed && this.bodyContact && this.wheelsInContact === 0 && this.autoFlipTime <= 0) {
       // turtle / on-side recovery ("auto flip")
-      this.autoFlipTime = 0.4;
-      this.autoFlipDir = right.y > 0 ? -1 : 1;
-      this.vel.y += 2.5;
+      this.autoFlipTime = 0.8;
+      // roll towards whichever side brings the roof up fastest
+      this.autoFlipDir = right.y > 0 ? 1 : -1;
+      this.vel.y += 3;
     } else if (!anyContact && jumpPressed && !this.hasDoubleJumped && !this.hasFlipped && !this.isJumping) {
       const withinWindow = !this.hasJumped || this.airTime < DOUBLEJUMP_WINDOW;
       if (withinWindow) {
@@ -509,18 +510,28 @@ export class Car {
       if (!this.isBoosting) this.vel.addScaledVector(fwd, input.throttle * THROTTLE_AIR_ACCEL * dt);
     }
 
-    // turtle recovery spin
+    // turtle recovery: roll about the forward axis until the wheels face down
+    let righting = false;
     if (this.autoFlipTime > 0) {
       this.autoFlipTime -= dt;
-      _a.copy(fwd).multiplyScalar(this.autoFlipDir * 40 * dt);
-      this.angVel.add(_a);
+      _qi.copy(this.quat).invert();
+      const u = _b.set(0, 1, 0).applyQuaternion(_qi); // world up in the car frame
+      let err = Math.atan2(u.z, u.y); // roll needed (+ = roll right)
+      if (u.y < -0.7) err = this.autoFlipDir * Math.PI; // upside down: keep the chosen direction
+      if (Math.abs(err) < 0.25 && u.y > 0.9) this.autoFlipTime = 0;
+      else {
+        const wl = _c.copy(this.angVel).applyQuaternion(_qi);
+        wl.x = Math.max(-9, Math.min(9, err * 7));
+        this.angVel.copy(wl.applyQuaternion(this.quat));
+        righting = true;
+      }
     }
 
     // ── limits ──────────────────────────────────────────────────────────
     const sp = this.vel.length();
     if (sp > MAX_CAR_SPEED) this.vel.multiplyScalar(MAX_CAR_SPEED / sp);
     const w = this.angVel.length();
-    if (w > MAX_ANG_SPEED && !anyContact) this.angVel.multiplyScalar(MAX_ANG_SPEED / w);
+    if (w > MAX_ANG_SPEED && !anyContact && !righting) this.angVel.multiplyScalar(MAX_ANG_SPEED / w);
 
     // supersonic
     const speed = Math.min(sp, MAX_CAR_SPEED);
@@ -537,7 +548,7 @@ export class Car {
     // ── integrate ───────────────────────────────────────────────────────
     this.pos.addScaledVector(this.vel, dt);
     if (w > 1e-6) {
-      const ang = (anyContact ? w : Math.min(w, MAX_ANG_SPEED)) * dt;
+      const ang = (anyContact || righting ? w : Math.min(w, MAX_ANG_SPEED)) * dt;
       _q.setFromAxisAngle(_a.copy(this.angVel).normalize(), ang);
       this.quat.premultiply(_q).normalize();
     }

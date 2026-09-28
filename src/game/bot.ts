@@ -26,6 +26,7 @@ export class Bot {
   private target = new Vector3();
   private wantBoost = false;
   private cooldown = 0;
+  private turtleTime = 0;
 
   constructor(slot: number, skill = 0.6) {
     this.slot = slot;
@@ -71,6 +72,15 @@ export class Bot {
         return inp;
       }
     }
+
+    // ── lying on the side / roof: tap jump to self-right ────────────
+    if (car.wheelsInContact === 0 && car.bodyContact && car.vel.length() < 3) {
+      this.turtleTime += DT;
+      inp.jump = this.turtleTime % 0.5 < 0.1;
+      this.airRecovery(car, inp);
+      return inp;
+    }
+    this.turtleTime = 0;
 
     // ── in the air: land on the wheels ──────────────────────────────
     if (car.wheelsInContact === 0) {

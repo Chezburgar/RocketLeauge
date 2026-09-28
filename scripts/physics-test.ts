@@ -188,6 +188,19 @@ function fresh() {
   for (let i = 0; i < 60; i++) { w.step([inp]); w2.step([inp]); }
   check('deterministic after deserialize', w.cars[0]!.pos.distanceTo(w2.cars[0]!.pos) < 0.01, f(w.cars[0]!.pos) + ' vs ' + f(w2.cars[0]!.pos));
 }
+// 13b. turtle recovery: upside down and on the side
+for (const [label, roll] of [['roof', Math.PI], ['left side', Math.PI / 2], ['right side', -Math.PI / 2]] as [string, number][]) {
+  const { w, car } = fresh();
+  car.quat.setFromAxisAngle(new Vector3(1, 0, 0), roll);
+  car.pos.y = 0.6;
+  const inp = emptyInput();
+  for (let i = 0; i < 90; i++) w.step([inp]);
+  for (let i = 0; i < 360; i++) {
+    inp.jump = i < 240 && i % 60 < 6 && car.up(new Vector3()).y < 0.7;
+    w.step([inp]);
+  }
+  check('recovers from ' + label, car.onGround && car.up(new Vector3()).y > 0.9, 'up.y=' + car.up(new Vector3()).y.toFixed(2) + ' wheels=' + car.wheelsInContact);
+}
 // 14. perf
 {
   const w = new World();
