@@ -352,8 +352,8 @@ export function buildArena(maxAniso: number, quality: number): ArenaRefs {
   // ── boost pads ─────────────────────────────────────────────────────
   const pads: ArenaRefs['pads'] = [];
   const padBaseMat = new THREE.MeshStandardMaterial({ color: 0x2a2f3a, roughness: 0.5, metalness: 0.6 });
-  const bigGlowMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(1.0, 0.6, 0.12).multiplyScalar(4), toneMapped: false, transparent: true });
-  const smallGlowMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(1.0, 0.75, 0.25).multiplyScalar(3), toneMapped: false, transparent: true });
+  const bigGlowMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(1.0, 0.62, 0.15).multiplyScalar(1.35), toneMapped: false, transparent: true, opacity: 0.92 });
+  const smallGlowMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(1.0, 0.55, 0.12).multiplyScalar(1.05), toneMapped: false, transparent: true, opacity: 0.9 });
   const bigBase = new THREE.CylinderGeometry(1.5, 1.7, 0.12, 12);
   const smallBase = new THREE.CylinderGeometry(0.8, 0.9, 0.06, 10);
   const orb = new THREE.IcosahedronGeometry(0.55, 0);

@@ -94,6 +94,7 @@ export class Hud {
   hide() {
     this.root.classList.add('hidden');
     this.closeChat();
+    this.clearDemo();
   }
 
   private bigText(text: string, ms = 900, color = '') {
@@ -111,6 +112,43 @@ export class Hud {
     this.feed.prepend(f);
     while (this.feed.children.length > 5) this.feed.lastChild?.remove();
     setTimeout(() => f.remove(), 4500);
+  }
+
+  private demoEl: HTMLElement | null = null;
+  private demoTimer: number | null = null;
+
+  /** Shown to the player whose car was destroyed, with a respawn countdown. */
+  showDemolished(by: string) {
+    this.clearDemo();
+    const sub = h('div', { class: 's' }, `by ${by}  ·  respawning in 3`);
+    const el = h('div', { class: 'demo-banner' }, h('div', { class: 't' }, 'DEMOLISHED'), sub);
+    this.root.appendChild(el);
+    this.demoEl = el;
+    let n = 3;
+    this.demoTimer = window.setInterval(() => {
+      n--;
+      if (n <= 0) this.clearDemo();
+      else sub.textContent = `by ${by}  ·  respawning in ${n}`;
+    }, 1000);
+  }
+
+  /** Shown to the attacker. */
+  showDemoHit(victim: string) {
+    this.clearDemo();
+    const el = h('div', { class: 'demo-hit' }, `DEMOLITION!  ${victim}`);
+    this.root.appendChild(el);
+    this.demoEl = el;
+    this.demoTimer = window.setTimeout(() => this.clearDemo(), 1400);
+  }
+
+  private clearDemo() {
+    if (this.demoTimer !== null) {
+      clearInterval(this.demoTimer);
+      clearTimeout(this.demoTimer);
+    }
+    this.demoTimer = null;
+    this.demoEl?.remove();
+    this.demoEl = null;
   }
 
   addChat(name: string, team: number, text: string) {
@@ -188,7 +226,7 @@ export class Hud {
         this.addFeed(`${name(e.slot)} – Shot on goal`, team(e.slot));
         break;
       case 'demo':
-        this.addFeed(`${name(e.attacker)} 💥 ${name(e.victim)}`, team(e.attacker));
+        this.addFeed(`${name(e.attacker)} DEMOLISHED ${name(e.victim)}`, team(e.attacker));
         break;
       case 'chat':
         this.addChat(name(e.slot), team(e.slot), e.text);

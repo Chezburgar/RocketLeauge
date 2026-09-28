@@ -22,6 +22,7 @@ import {
   curve,
   DODGE_DEADZONE,
   DOUBLEJUMP_WINDOW,
+  FLIP_ANG_SPEED,
   FLIP_BACKWARD_SCALE,
   FLIP_FORWARD_SCALE,
   FLIP_INITIAL_VEL,
@@ -114,6 +115,8 @@ const _ha = new Vector3();
 const _hb = new Vector3();
 const _hc = new Vector3();
 const _hqi = new Quaternion();
+const _hqi2 = new Quaternion();
+const _e = new Vector3();
 
 export interface WheelContact {
   inContact: boolean;
@@ -142,6 +145,8 @@ export class Car {
   flipTime = 0;
   flipFwd = 0;
   flipSide = 0;
+  /** rotation accumulated by the current flip (rad) */
+  flipAngle = 0;
   prevJump = false;
   autoFlipTime = 0;
   autoFlipDir = 0;
@@ -400,7 +405,7 @@ export class Car {
     // ── surface following (arcade assist) ───────────────────────────────
     // With two or more wheels down the chassis is steered onto the surface normal and
     // velocity into the surface is redirected along it, so ramps and walls keep momentum.
-    if (this.wheelsInContact >= 2 && !this.isJumping && !this.isFlipping && this.autoFlipTime <= 0 && up.dot(_avgN) > 0.6) {
+    if (this.wheelsInContact >= 2 && !this.isJumping && !this.isFlipping && this.autoFlipTime <= 0 && up.dot(_avgN) > 0.75) {
       // (small approach speeds are left to the suspension so the car still settles)
       const into = this.vel.dot(_avgN);
       if (into < -0.5) this.vel.addScaledVector(_avgN, -(into + 0.5));
@@ -410,8 +415,9 @@ export class Car {
         _qi.identity().slerp(_q, this.wheelsInContact >= 3 ? 0.35 : 0.2);
         this.quat.premultiply(_qi).normalize();
       }
-      // keep only the yaw part of the rotation (about the surface normal)
-      const yawRate = this.angVel.dot(_avgN);
+      // keep only the car's own yaw rate (measured about its up axis, so roll / pitch
+      // spin never leaks into yaw when landing tilted) and turn it about the surface normal
+      const yawRate = this.angVel.dot(up);
       this.angVel.copy(_avgN).multiplyScalar(yawRate);
       fwd.set(1, 0, 0).applyQuaternion(this.quat);
       up.set(0, 1, 0).applyQuaternion(this.quat);
@@ -457,8 +463,24 @@ export class Car {
     }
 
     // ── flip ────────────────────────────────────────────────────────────
+    if (this.hasFlipped) this.flipTime += dt;
     if (this.isFlipping) {
-      this.flipTime += dt;
+      // track how far we've rotated about the flip axis; stop after one full turn
+      _qi.copy(this.quat).invert();
+      const wlf = _b.copy(this.angVel).applyQuaternion(_qi);
+      const axLen = Math.hypot(this.flipSide, this.flipFwd) || 1;
+      const rate = (wlf.x * this.flipSide - wlf.z * this.flipFwd) / axLen;
+      this.flipAngle += Math.max(0, rate) * dt;
+      if (this.flipAngle >= Math.PI * 2 * 0.96) {
+        // done: remove most of the spin about the flip axis
+        wlf.x -= (this.flipSide / axLen) * rate * 0.9;
+        wlf.z += (this.flipFwd / axLen) * rate * 0.9;
+        this.angVel.copy(wlf.applyQuaternion(this.quat));
+        this.isFlipping = false;
+        this.flipTime = Math.max(this.flipTime, FLIP_TORQUE_TIME);
+      }
+    }
+    if (this.isFlipping) {
       if (this.flipTime < FLIP_TORQUE_TIME) {
         // local angular accel: roll about +x, pitch about +z
         // pulling the stick against a front/back flip cancels the pitch spin ("flip cancel")
@@ -500,6 +522,14 @@ export class Car {
       _qi.copy(this.quat).invert();
       const wl = _b.copy(this.angVel).applyQuaternion(_qi);
       const flipping = this.isFlipping && this.flipTime < FLIP_TORQUE_TIME;
+      // right after a flip, bleed off the leftover spin so the car finishes one clean rotation
+      if (this.hasFlipped && !flipping && this.flipTime < FLIP_TORQUE_TIME + 0.35) {
+        const damp = Math.exp(-dt * 11);
+        if (this.flipFwd !== 0 && pitch === 0) wl.z *= damp;
+        if (this.flipSide !== 0 && roll === 0) wl.x *= damp;
+        this.angVel.copy(_c.copy(wl).applyQuaternion(this.quat));
+        wl.copy(_c.copy(this.angVel).applyQuaternion(_qi));
+      }
       const ax = roll * AIR_ROLL_TORQUE - (flipping && this.flipSide !== 0 ? 0 : wl.x * AIR_ROLL_DAMP);
       const ay = -yaw * AIR_YAW_TORQUE - wl.y * AIR_YAW_DAMP * (1 - Math.abs(yaw));
       const az =
@@ -530,8 +560,14 @@ export class Car {
     // ── limits ──────────────────────────────────────────────────────────
     const sp = this.vel.length();
     if (sp > MAX_CAR_SPEED) this.vel.multiplyScalar(MAX_CAR_SPEED / sp);
+    // flips may spin faster than normal air control; the cap eases back afterwards
+    let angCap = MAX_ANG_SPEED;
+    if (this.hasFlipped && this.flipTime < FLIP_TORQUE_TIME + 0.12) {
+      const k = Math.max(0, (this.flipTime - FLIP_TORQUE_TIME) / 0.12);
+      angCap = FLIP_ANG_SPEED + (MAX_ANG_SPEED - FLIP_ANG_SPEED) * k;
+    }
     const w = this.angVel.length();
-    if (w > MAX_ANG_SPEED && !anyContact && !righting) this.angVel.multiplyScalar(MAX_ANG_SPEED / w);
+    if (w > angCap && !anyContact && !righting) this.angVel.multiplyScalar(angCap / w);
 
     // supersonic
     const speed = Math.min(sp, MAX_CAR_SPEED);
@@ -548,7 +584,7 @@ export class Car {
     // ── integrate ───────────────────────────────────────────────────────
     this.pos.addScaledVector(this.vel, dt);
     if (w > 1e-6) {
-      const ang = (anyContact || righting ? w : Math.min(w, MAX_ANG_SPEED)) * dt;
+      const ang = (anyContact || righting ? w : Math.min(w, angCap)) * dt;
       _q.setFromAxisAngle(_a.copy(this.angVel).normalize(), ang);
       this.quat.premultiply(_q).normalize();
     }
@@ -571,6 +607,7 @@ export class Car {
     this.flipTime = 0;
     this.flipFwd = dx;
     this.flipSide = dy;
+    this.flipAngle = 0;
 
     const ratio = Math.min(1, Math.abs(forwardSpeed) / MAX_CAR_SPEED);
     const backwards = Math.abs(forwardSpeed) < 1 ? dx < 0 : dx >= 0 !== forwardSpeed >= 0;
@@ -588,7 +625,7 @@ export class Car {
     const r = _b.set(-f.z, 0, f.x); // right of flattened forward
     this.vel.addScaledVector(f, vx).addScaledVector(r, vy);
     // kick off the rotation immediately
-    _c.set(dy * 5.5, 0, -dx * 5.5).applyQuaternion(this.quat);
+    _c.set(dy * FLIP_ANG_SPEED, 0, -dx * FLIP_ANG_SPEED).applyQuaternion(this.quat);
     this.angVel.copy(_c);
   }
 
@@ -612,16 +649,22 @@ export class Car {
           const restitution = vn < -3 ? 0.25 : 0;
           const jn = -(1 + restitution) * vn * m * 0.5;
           _d.copy(_c).multiplyScalar(jn);
-          // friction
+          this.applyImpulse(_d, _a);
+          // scrape friction, applied on the car's centre line so a corner digging in
+          // slows the car down without spinning it around
           _b.addScaledVector(_c, -vn);
           const vt = _b.length();
           if (vt > 1e-4) {
             _b.multiplyScalar(1 / vt);
-            const mt = this.effectiveMass(_a, _b);
-            const jt = Math.min(vt * mt * 0.5, jn * 0.6);
-            _d.addScaledVector(_b, -jt);
+            _hqi2.copy(this.quat).invert();
+            _e.subVectors(_a, this.pos).applyQuaternion(_hqi2);
+            _e.z = 0;
+            _e.applyQuaternion(this.quat).add(this.pos);
+            const mt = this.effectiveMass(_e, _b);
+            const jt = Math.min(vt * mt * 0.5, jn * 0.35);
+            _d.copy(_b).multiplyScalar(-jt);
+            this.applyImpulse(_d, _e);
           }
-          this.applyImpulse(_d, _a);
         }
         if (-d > deepest) {
           deepest = -d;
@@ -634,7 +677,7 @@ export class Car {
   }
 
   /** Numbers written to snapshots (order matters – see serialize). */
-  static readonly STATE_SIZE = 30;
+  static readonly STATE_SIZE = 31;
   writeState(a: Float32Array | number[], o: number) {
     a[o++] = this.pos.x; a[o++] = this.pos.y; a[o++] = this.pos.z;
     a[o++] = this.vel.x; a[o++] = this.vel.y; a[o++] = this.vel.z;
@@ -667,6 +710,7 @@ export class Car {
     a[o++] = this.wheelsInContact;
     a[o++] = this.handbrake;
     a[o++] = this.steerAngle;
+    a[o++] = this.flipAngle;
     return o;
   }
 
@@ -702,6 +746,7 @@ export class Car {
     this.wheelsInContact = a[o++];
     this.handbrake = a[o++];
     this.steerAngle = a[o++];
+    this.flipAngle = a[o++];
     return o;
   }
 }

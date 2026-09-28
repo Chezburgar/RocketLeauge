@@ -268,10 +268,14 @@ input, select { font-family: var(--font); font-weight: 600; }
 .boost-meter .num { position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--display); font-size: 50px; text-shadow: 0 0 10px rgba(0, 0, 0, 0.6); }
 .boost-meter .lbl { position: absolute; bottom: 36px; width: 100%; text-align: center; font-size: 14px; letter-spacing: 3px; color: #ffd28a; }
 .big-center { position: absolute; top: 34%; left: 0; right: 0; text-align: center; font-family: var(--display); font-size: 120px; text-shadow: 0 0 30px rgba(95, 211, 255, 0.8), 0 6px 0 rgba(0, 0, 0, 0.4); animation: pop 0.4s ease; }
-.goal-banner { position: absolute; top: 26%; left: 0; right: 0; text-align: center; animation: pop 0.5s ease; }
-.goal-banner .g { font-family: var(--display); font-size: 150px; letter-spacing: 6px; line-height: 1; }
-.goal-banner .who { font-size: 34px; margin-top: 6px; }
-.goal-banner .spd { font-size: 22px; color: #dfe9ff; margin-top: 4px; }
+.goal-banner { position: absolute; top: 84px; left: 50%; transform: translateX(-50%); text-align: center; animation: pop 0.4s ease; padding: 6px 26px 8px; background: linear-gradient(90deg, transparent, rgba(4, 8, 22, 0.78) 18%, rgba(4, 8, 22, 0.78) 82%, transparent); white-space: nowrap; }
+.goal-banner .g { font-family: var(--display); font-size: 46px; letter-spacing: 4px; line-height: 1; }
+.goal-banner .who { font-size: 20px; margin-top: 2px; }
+.goal-banner .spd { font-size: 15px; color: #dfe9ff; margin-top: 1px; letter-spacing: 1px; }
+.demo-banner { position: absolute; top: 40%; left: 0; right: 0; text-align: center; font-family: var(--display); animation: pop 0.35s ease; text-shadow: 0 0 24px rgba(255, 90, 40, 0.8), 0 4px 0 rgba(0, 0, 0, 0.4); }
+.demo-banner .t { font-size: 56px; color: #ff7a3a; letter-spacing: 3px; }
+.demo-banner .s { font-size: 22px; color: #fff; font-family: var(--font); margin-top: 4px; }
+.demo-hit { position: absolute; top: 30%; left: 0; right: 0; text-align: center; font-family: var(--display); font-size: 38px; color: #ffb36b; letter-spacing: 3px; animation: pop 0.3s ease; text-shadow: 0 0 20px rgba(255, 120, 40, 0.8); }
 .feed { position: absolute; right: 22px; top: 90px; display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
 .feed .f { padding: 7px 14px; background: rgba(6, 10, 24, 0.82); border-right: 4px solid var(--accent); font-size: 18px; animation: slideIn 0.3s ease; }
 .feed .f.b { border-right-color: var(--blue); }
@@ -310,7 +314,7 @@ input, select { font-family: var(--font); font-weight: 600; }
   .logo .word { font-size: 54px; text-align: center; }
   .menu-item { width: 230px; font-size: 20px; }
   .now-playing { display: none; }
-  .goal-banner .g { font-size: 80px; }
+  .goal-banner .g { font-size: 34px; }
 }
 @media (max-height: 760px) {
   .menu-brand { top: 3vh; font-size: 28px; }

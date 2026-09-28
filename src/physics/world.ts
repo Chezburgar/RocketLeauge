@@ -232,12 +232,15 @@ export class World {
       _a.set(car.pos.x - x, car.pos.y - y, car.pos.z - z);
       const d = _a.length();
       if (d > radius || d < 1e-3) continue;
-      const k = (1 - d / radius) * strength;
+      const f = 1 - d / radius;
+      const k = strength * Math.pow(f, 0.8);
       _a.multiplyScalar(k / d);
-      _a.y += k * 0.35;
+      _a.y = Math.max(_a.y, 0) + k * 0.45;
       car.vel.add(_a);
-      car.angVel.x += (Math.random() - 0.5) * k * 0.2;
-      car.angVel.z += (Math.random() - 0.5) * k * 0.2;
+      // tumble a little (deterministic from the car id so replays / clients agree)
+      const s = Math.sin(car.id * 12.9898 + this.tick) * 0.5;
+      car.angVel.x += s * k * 0.25;
+      car.angVel.z += (0.5 - Math.abs(s)) * k * 0.25;
     }
   }
 
@@ -342,11 +345,11 @@ export class World {
   private tryBump(att: Car, vic: Car, nToVictim: Vector3, p: Vector3, approach: number) {
     if (approach < 2) return;
     const fwd = att.forward(_fwd);
-    if (fwd.dot(nToVictim) < 0.6) return;
-    // contact must be on the attacker's front
+    if (fwd.dot(nToVictim) < 0.45) return;
+    // contact must be on the attacker's front half
     _qi.copy(att.quat).invert();
     const lp = _a.subVectors(p, att.pos).applyQuaternion(_qi);
-    if (lp.x < CAR_HITBOX_OFFSET.x + CAR_HALF.x * 0.4) return;
+    if (lp.x < CAR_HITBOX_OFFSET.x) return;
     if (vic.bumpCooldown > 0 && vic.lastBumper === att.id) return;
     const speed = att.vel.dot(nToVictim);
     if (speed < 3) return;
@@ -358,9 +361,9 @@ export class World {
     }
     const onGround = vic.onGround;
     const amount = onGround
-      ? curve([[0, 0], [14, 11], [22, 15.3]], speed)
-      : curve([[0, 0], [14, 13], [22, 19]], speed);
-    const upward = onGround ? curve([[0, 0], [14, 2.78], [22, 4.17]], speed) : 0;
+      ? curve([[0, 0], [12.5, 11], [20, 15.3]], speed)
+      : curve([[0, 0], [12.5, 13], [20, 19]], speed);
+    const upward = onGround ? curve([[0, 0], [12.5, 2.78], [20, 4.17]], speed) : 0;
     const dir = _b.copy(nToVictim);
     if (onGround) {
       dir.y = 0;

@@ -14,6 +14,14 @@ A browser car-soccer game in the spirit of Rocket League, with a semi-low-poly l
 - **Accounts:** tied to the device, with no email and no password. New players choose a name and request access, and the admin approves them.
 - **Admin panel:** approve/deny requests, manage players (revoke, ban, rename, promote to admin, delete), upload songs, build main-menu playlists (in order, shuffle, or radio-sync where everyone hears the same moment), choose the live playlist, and upload custom anthems.
 
+### Physics notes
+
+- The ball model follows [rl_ball_sym](https://github.com/VirxEC/rl_ball_sym) (MIT): gravity 6.5 m/s², 3 %/s drag, restitution 0.6, contact friction 0.35 applied at the contact point, max speed 60 m/s and max spin 6 rad/s.
+- Cars are tuned about 10 % slower than the reference game (top speed 20.5 m/s, 12.5 m/s without boost) and car touches hit the ball about 25 % harder, so the ball out-paces the cars.
+- Flips do exactly one fast rotation (about 0.6 s), then the leftover spin is damped so you land on your wheels.
+- **Demolitions:** hitting an opponent with your front while supersonic (boosting at top speed) destroys their car, and they respawn 3 s later. Slower hits are bumps.
+- **Goal explosions** launch every car within about 40 m of the ball.
+
 ## Controls
 
 | Keyboard / mouse | Gamepad | Action |

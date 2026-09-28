@@ -16,15 +16,16 @@ for (let g = 0; g < 6; g++) {
   m.startKickoff();
   let ticks = 0;
   const touches = [0, 0];
+  let demos = 0;
   while (m.phase !== 'ended' && ticks < 120 * 200) {
     const inputs = [];
     for (let s = 0; s < 6; s++) inputs[s] = bots[s] ? bots[s].update(m.world) : null;
     m.tick(inputs);
-    for (const e of m.worldEvents) if (e.type === 'touch') touches[e.car < 3 ? 0 : 1]++;
+    for (const e of m.worldEvents) { if (e.type === 'touch') touches[e.car < 3 ? 0 : 1]++; if (e.type === 'demo') demos++; }
     m.worldEvents.length = 0; m.events.length = 0; ticks++;
   }
   tot[0] += m.scores[0]; tot[1] += m.scores[1];
   touchesAll += touches[0] + touches[1];
-  console.log(slots.length / 2 + 'v' + slots.length / 2, 'score', m.scores, 'touches', touches, m.overtime ? 'OT' : '', (ticks / 120).toFixed(0) + 's');
+  console.log(slots.length / 2 + 'v' + slots.length / 2, 'score', m.scores, 'touches', touches, 'demos', demos, m.overtime ? 'OT' : '', (ticks / 120).toFixed(0) + 's');
 }
 console.log('total goals', tot, 'touches', touchesAll);

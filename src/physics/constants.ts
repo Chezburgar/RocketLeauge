@@ -33,16 +33,17 @@ export const CAR_HITBOX_OFFSET = { x: 0.1388, y: 0.2075, z: 0 };
 export const CAR_INERTIA = { x: 12.6, y: 31.5, z: 22.8 }; // about local axes
 export const CAR_REST_HEIGHT = 0.17;
 
-export const MAX_CAR_SPEED = 23.0;
-export const SUPERSONIC_START = 22.0;
-export const SUPERSONIC_MAINTAIN = 21.0;
+// Pace tuning: cars are ~10% slower than the reference game so the ball can out-pace them.
+export const MAX_CAR_SPEED = 20.5;
+export const SUPERSONIC_START = 19.5;
+export const SUPERSONIC_MAINTAIN = 18.5;
 export const MAX_ANG_SPEED = 5.5;
 
 export const BOOST_MAX = 100;
 export const BOOST_START = 33.3;
 export const BOOST_USE = 33.3; // per second
-export const BOOST_ACCEL_GROUND = 9.9167;
-export const BOOST_ACCEL_AIR = 10.5833;
+export const BOOST_ACCEL_GROUND = 8.8;
+export const BOOST_ACCEL_AIR = 9.4;
 export const BOOST_MIN_TIME = 0.1;
 
 export const BRAKE_ACCEL = 35.0;
@@ -50,9 +51,9 @@ export const COAST_DECEL = 5.25;
 export const THROTTLE_AIR_ACCEL = 0.6667;
 // forward speed (m/s) → acceleration (m/s²)
 export const THROTTLE_CURVE: [number, number][] = [
-  [0, 16.0],
-  [14.0, 1.6],
-  [14.1, 0],
+  [0, 14.5],
+  [12.4, 1.4],
+  [12.5, 0],
 ];
 // forward speed (m/s) → max steer angle (rad)
 export const STEER_CURVE: [number, number][] = [
@@ -81,7 +82,8 @@ export const FLIP_INITIAL_VEL = 5.0;
 export const FLIP_FORWARD_SCALE = 1.0;
 export const FLIP_SIDE_SCALE = 1.9;
 export const FLIP_BACKWARD_SCALE = 2.5;
-export const FLIP_ANG_SPEED = 5.5;
+/** flips spin much faster than normal air control (a full front flip takes ~0.65 s) */
+export const FLIP_ANG_SPEED = 9.8;
 
 export const AIR_PITCH_TORQUE = 12.46;
 export const AIR_YAW_TORQUE = 9.11;
@@ -104,11 +106,12 @@ export const BUMP_COOLDOWN = 0.25;
 export const HIT_Z_SCALE = 0.35;
 export const HIT_FORWARD_SCALE = 0.65;
 export const HIT_MAX_DELTA = 46.0;
+// (boosted ~25% over the reference so the ball flies off the car faster than the car can chase)
 export const HIT_CURVE: [number, number][] = [
-  [0, 0.65],
-  [5, 0.65],
-  [23, 0.55],
-  [46, 0.3],
+  [0, 0.82],
+  [5, 0.82],
+  [23, 0.7],
+  [46, 0.4],
 ];
 
 // ── Boost pads (RL soccar layout, converted to metres; x across, z along) ──

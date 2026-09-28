@@ -27,6 +27,8 @@ export class Bot {
   private wantBoost = false;
   private cooldown = 0;
   private turtleTime = 0;
+  private demoChase = 0;
+  private demoCooldown = 0;
 
   constructor(slot: number, skill = 0.6) {
     this.slot = slot;
@@ -46,6 +48,7 @@ export class Bot {
       this.pred.update(ball.pos, ball.vel, ball.angVel);
     }
     if (this.cooldown > 0) this.cooldown -= DT;
+    if (this.demoCooldown > 0) this.demoCooldown -= DT;
 
     // ── running jump / flip sequence ─────────────────────────────────
     if (this.seq) {
@@ -259,5 +262,50 @@ export class Bot {
     // stay on the pitch
     this.target.x = Math.max(-38, Math.min(38, this.target.x));
     this.target.z = Math.max(-49, Math.min(49, this.target.z));
+    this.lookForDemo(world, car, danger);
+  }
+
+  /** Skilled bots go for a demolition when an opponent is lined up and the ball isn't urgent. */
+  private lookForDemo(world: World, car: Car, danger: boolean) {
+    if (this.demoCooldown > 0) return;
+    if (this.demoChase > 2.5) {
+      // give up and play the ball for a while
+      this.demoChase = 0;
+      this.demoCooldown = 6;
+      return;
+    }
+    const fast = car.supersonic || (car.vel.length() > 15 && car.boost > 30);
+    if (this.skill < 0.55 || danger || !fast || !car.onGround) {
+      this.demoChase = 0;
+      return;
+    }
+    const ballDist = car.pos.distanceTo(world.ball.pos);
+    if (ballDist < 18) return;
+    // never leave the net empty: someone on our team must be closer to our goal
+    const ownZ = car.team === 0 ? -51.2 : 51.2;
+    const myBack = Math.abs(car.pos.z - ownZ);
+    let covered = false;
+    for (const t of world.cars) if (t && t !== car && t.team === car.team && !t.demolished && Math.abs(t.pos.z - ownZ) < myBack) covered = true;
+    if (!covered && Math.abs(world.ball.pos.z - ownZ) < 60) return;
+    const fwd = _v.set(1, 0, 0).applyQuaternion(car.quat);
+    let best: Car | null = null;
+    let bestD = 28;
+    for (const o of world.cars) {
+      if (!o || o.team === car.team || o.demolished) continue;
+      const to = _t.copy(o.pos).addScaledVector(o.vel, 0.35).sub(car.pos);
+      const d = to.length();
+      if (d > bestD || d < 3) continue;
+      if (to.normalize().dot(fwd) < 0.8) continue;
+      best = o;
+      bestD = d;
+    }
+    if (!best) {
+      this.demoChase = 0;
+      return;
+    }
+    this.demoChase += 0.05 + (1 - this.skill) * 0.25; // ≈ time between decisions
+    this.target.copy(best.pos).addScaledVector(best.vel, 0.35);
+    this.target.y = 0;
+    this.wantBoost = true;
   }
 }

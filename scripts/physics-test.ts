@@ -29,14 +29,16 @@ function fresh() {
 // 2. throttle to max drive speed
 {
   const { w, car } = fresh();
+  car.reset(0, -45, 0);
+  w.ball.reset(30, 0.9125, 0);
   const inp = emptyInput();
   inp.throttle = 1;
   let t1 = -1;
   for (let i = 0; i < 600; i++) {
     w.step([inp]);
-    if (t1 < 0 && car.vel.length() > 13.5) t1 = i * DT;
+    if (t1 < 0 && car.vel.length() > 12) t1 = i * DT;
   }
-  check('throttle top speed ≈14.1', Math.abs(car.vel.length() - 14.1) < 0.4, 'v=' + car.vel.length().toFixed(2) + ' t(13.5)=' + t1.toFixed(2) + ' pos=' + f(car.pos));
+  check('throttle top speed ≈12.5', Math.abs(car.vel.length() - 12.5) < 0.3, 'v=' + car.vel.length().toFixed(2) + ' t(12)=' + t1.toFixed(2) + ' pos=' + f(car.pos));
 }
 // 3. boost to supersonic
 {
@@ -200,6 +202,33 @@ for (const [label, roll] of [['roof', Math.PI], ['left side', Math.PI / 2], ['ri
     w.step([inp]);
   }
   check('recovers from ' + label, car.onGround && car.up(new Vector3()).y > 0.9, 'up.y=' + car.up(new Vector3()).y.toFixed(2) + ' wheels=' + car.wheelsInContact);
+}
+// 13c. demolitions: a supersonic front hit on an opponent demolishes, a slow one only bumps
+for (const [label, yawB, fast] of [['rear-end', 0, true], ['head-on', Math.PI, true], ['t-bone', Math.PI / 2, true], ['slow bump', 0, false]] as [string, number, boolean][]) {
+  const w = new World();
+  const a = w.addCar(0, 0);
+  const b = w.addCar(3, 1);
+  a.reset(0, fast ? -48 : 10, 0);
+  b.reset(0, 20, yawB);
+  a.boost = 100;
+  const inA = emptyInput();
+  inA.throttle = 1;
+  inA.boost = fast;
+  let demo = false, bump = false;
+  for (let i = 0; i < 720 && !demo && !bump; i++) {
+    w.step([inA, null, null, emptyInput()]);
+    for (const e of w.events) { if (e.type === 'demo') demo = true; if (e.type === 'bump') bump = true; }
+    w.events.length = 0;
+  }
+  check('demo: ' + label, fast ? demo : bump && !demo, `demo=${demo} bump=${bump}`);
+}
+// 13d. goal explosion blasts nearby cars away
+{
+  const w = new World();
+  const near = w.addCar(0, 0); near.reset(0, 40, 0);
+  const far = w.addCar(3, 1); far.reset(0, -30, 0);
+  w.explode(0, 2, 50, 42, 30);
+  check('goal blast launches nearby cars', near.vel.length() > 12 && near.vel.z < -5 && near.vel.y > 3 && far.vel.length() < 0.01, 'near v=' + f(near.vel) + ' far v=' + f(far.vel));
 }
 // 14. perf
 {

@@ -267,13 +267,15 @@ export function buildCar(loadout: Loadout, team: number): CarVisual {
   const accentMat = new THREE.MeshStandardMaterial({ color: accent, metalness: 0.25, roughness: 0.5, flatShading: true });
   const dark = new THREE.MeshStandardMaterial({ color: 0x15171d, metalness: 0.2, roughness: 0.7, flatShading: true });
   const glass = new THREE.MeshStandardMaterial({ color: 0x0b1320, metalness: 0.6, roughness: 0.15, flatShading: true });
-  const headlight = new THREE.MeshBasicMaterial({ color: new THREE.Color(1, 1, 0.95).multiplyScalar(5), toneMapped: false });
-  const taillight = new THREE.MeshBasicMaterial({ color: new THREE.Color(1, 0.1, 0.1).multiplyScalar(4), toneMapped: false });
-  const glowMat = new THREE.MeshBasicMaterial({ color: accent.clone().multiplyScalar(3.5), toneMapped: false });
-  const teamGlow = new THREE.MeshBasicMaterial({ color: primary.clone().multiplyScalar(3.5), toneMapped: false });
+  const headlight = new THREE.MeshBasicMaterial({ color: new THREE.Color(1, 1, 0.95).multiplyScalar(2.2), toneMapped: false });
+  const taillight = new THREE.MeshBasicMaterial({ color: new THREE.Color(1, 0.1, 0.1).multiplyScalar(1.8), toneMapped: false });
+  const glowMat = new THREE.MeshBasicMaterial({ color: accent.clone().multiplyScalar(1.4), toneMapped: false });
+  // wheel accents glow softly (they're on screen all the time)
+  const wheelGlow = new THREE.MeshStandardMaterial({ color: accent.clone().multiplyScalar(0.6), emissive: accent, emissiveIntensity: 0.55, roughness: 0.5, flatShading: true });
+  const teamGlow = new THREE.MeshBasicMaterial({ color: primary.clone().multiplyScalar(1.6), toneMapped: false });
   const tireMat = new THREE.MeshStandardMaterial({ color: 0x141414, roughness: 0.9, flatShading: true });
-  const rimMat = new THREE.MeshStandardMaterial({ color: accent.clone().lerp(new THREE.Color(0xcccccc), 0.35), metalness: 0.85, roughness: 0.25, flatShading: true });
-  const mats = [paint, accentMat, dark, glass, headlight, taillight, glowMat, teamGlow, tireMat, rimMat];
+  const rimMat = new THREE.MeshStandardMaterial({ color: accent.clone().lerp(new THREE.Color(0x9a9a9a), 0.35), metalness: 0.55, roughness: 0.45, flatShading: true });
+  const mats = [paint, accentMat, dark, glass, headlight, taillight, glowMat, wheelGlow, teamGlow, tireMat, rimMat];
 
   const add = (geo: THREE.BufferGeometry, mat: THREE.Material, shadow = true) => {
     const m = new THREE.Mesh(geo, mat);
@@ -383,7 +385,7 @@ export function buildCar(loadout: Loadout, team: number): CarVisual {
     const pivot = new THREE.Group();
     const spin = new THREE.Group();
     const width = w.front ? 0.13 : 0.15;
-    const mesh = wheelMesh(loadout.wheels, w.radius, width, accent, rimMat, tireMat, glowMat);
+    const mesh = wheelMesh(loadout.wheels, w.radius, width, accent, rimMat, tireMat, wheelGlow);
     spin.add(mesh);
     pivot.add(spin);
     const z = Math.sign(w.z) * (Math.abs(w.z) + 0.04);

@@ -17,6 +17,9 @@ export const PHASE_IDS: Phase[] = ['countdown', 'playing', 'goal', 'replay', 'en
 const GOAL_PHASE_TIME = 3.0;
 const REPLAY_TIME = 6.0;
 const COUNTDOWN_TIME = 3.0;
+/** goal explosions launch every car within this radius (m) */
+const GOAL_BLAST_RADIUS = 42;
+const GOAL_BLAST_STRENGTH = 30;
 
 /** Authoritative game rules layered on top of the physics world (run by offline games and hosts). */
 export class Match {
@@ -279,7 +282,7 @@ export class Match {
           this.phaseTime = 0;
           this.lastGoal = { type: 'goal', team: e.team, scorer: this.touches.at(-1)?.slot ?? -1, assister: -1, speed: e.speed, x: e.x, y: e.y, z: e.z, ownGoal: false };
           this.emit(this.lastGoal);
-          this.world.explode(e.x, e.y, e.z, 14, 16);
+          this.world.explode(e.x, e.y, e.z, GOAL_BLAST_RADIUS, GOAL_BLAST_STRENGTH);
           break;
         }
         if (this.phase !== 'playing') break;
@@ -320,7 +323,7 @@ export class Match {
         this.emit(this.lastGoal);
         this.phase = 'goal';
         this.phaseTime = GOAL_PHASE_TIME;
-        this.world.explode(e.x, e.y, e.z, 14, 16);
+        this.world.explode(e.x, e.y, e.z, GOAL_BLAST_RADIUS, GOAL_BLAST_STRENGTH);
         break;
       }
     }

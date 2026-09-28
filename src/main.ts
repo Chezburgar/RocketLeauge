@@ -131,6 +131,7 @@ class App {
       else {
         frame = s.renderFrame();
         this.view.ballHidden = s.phase === 'goal' || (s.phase === 'freeplay' && s.world.goalScored);
+        this.view.explosionFocus = this.view.ballHidden ? this.view.goalFocus : null;
       }
       // camera mode
       if (replaying) this.view.setCamMode('replay');
@@ -301,10 +302,18 @@ class App {
       case 'save':
         audio.cheer(0.6, 2);
         break;
-      case 'demo':
-        this.view.effects.demolition(new THREE.Vector3(e.x, e.y, e.z), new THREE.Color(TEAM_COLORS[s.players[e.victim]?.team ?? 0]));
-        audio.demo();
+      case 'demo': {
+        const at = new THREE.Vector3(e.x, e.y, e.z);
+        this.view.effects.demolition(at, new THREE.Color(TEAM_COLORS[s.players[e.victim]?.team ?? 0]));
+        const me = s.world.cars[s.localSlot];
+        const dist = me && !me.demolished ? me.pos.distanceTo(at) : 0;
+        audio.demo(dist);
+        if (dist < 30) this.view.effects.shake = Math.max(this.view.effects.shake, 0.8 * (1 - dist / 30));
+        if (e.victim === s.localSlot) this.hud.showDemolished(s.players[e.attacker]?.name ?? '???');
+        else if (e.attacker === s.localSlot) this.hud.showDemoHit(s.players[e.victim]?.name ?? '???');
+        audio.cheer(0.5, 1.5);
         break;
+      }
       case 'overtime':
         audio.cheer(0.7, 2.5);
         break;

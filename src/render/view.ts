@@ -70,6 +70,8 @@ export class GameView {
   private menuAngle = 0;
   private replayCamPos = new THREE.Vector3(0, 8, 0);
   goalFocus = new THREE.Vector3();
+  /** set during the post-goal phase so ball cam keeps watching the explosion */
+  explosionFocus: THREE.Vector3 | null = null;
   /** hide the ball (after a goal) */
   ballHidden = false;
   private width = 1;
@@ -417,9 +419,11 @@ export class GameView {
         const targetUp = car.wheelsInContact >= 3 && !car.demolished ? carUp : WORLD_UP;
         this.camUp.lerp(targetUp, 1 - Math.exp(-dt * 5)).normalize();
         const up = this.camUp;
+        // ball cam follows the ball – or, right after a goal, the spot where it exploded
+        const tgt = !this.ballHidden && f.ballVisible ? f.ballPos : this.explosionFocus;
         let dir: THREE.Vector3;
-        if (this.ballCam && !this.ballHidden && f.ballVisible) {
-          dir = _v.subVectors(car.pos, f.ballPos);
+        if (this.ballCam && tgt) {
+          dir = _v.subVectors(car.pos, tgt);
           dir.addScaledVector(up, -dir.dot(up) * 0.85);
           if (dir.lengthSq() < 1e-4) dir.set(0, 0, -1);
           dir.normalize();
@@ -436,8 +440,8 @@ export class GameView {
         // keep the camera inside the arena-ish (don't clip through the floor)
         if (this.camPos.y < 0.3) this.camPos.y = 0.3;
         let look: THREE.Vector3;
-        if (this.ballCam && !this.ballHidden && f.ballVisible) {
-          look = _v.copy(f.ballPos);
+        if (this.ballCam && tgt) {
+          look = _v.copy(tgt);
           // don't let the view swing too high: blend towards a point ahead of the car
           const ahead = _v3.copy(car.pos).addScaledVector(dir, -4).addScaledVector(up, 0.6);
           const toBall = look.clone().sub(this.camPos).normalize();

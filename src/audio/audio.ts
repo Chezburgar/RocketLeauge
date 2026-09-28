@@ -137,9 +137,11 @@ export class AudioEngine {
     this.tone('triangle', big ? 660 : 880, big ? 1320 : 1320, big ? 0.35 : 0.15, big ? 0.25 : 0.12);
     if (big) this.tone('sine', 990, 1980, 0.3, 0.15, 0.05);
   }
-  demo() {
-    this.noise(1.0, 'lowpass', 1800, 0.5, 1.0, 0, 120);
-    this.tone('sawtooth', 90, 30, 0.6, 0.4);
+  demo(distance = 0) {
+    const k = 1 / (1 + distance * 0.04);
+    this.noise(1.0, 'lowpass', 1800, 0.5, 1.0 * k, 0, 120);
+    this.tone('sawtooth', 90, 30, 0.6, 0.4 * k);
+    this.noise(0.25, 'highpass', 2500, 0.6, 0.35 * k);
   }
   bump(strength: number) {
     this.noise(0.15, 'lowpass', 900, 0.9, Math.min(0.7, strength / 25));

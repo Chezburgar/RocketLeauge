@@ -106,6 +106,7 @@ export class Effects {
     const mat = new THREE.SpriteMaterial({ map: this.flashTex, color: color.clone().multiplyScalar(1.4), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.8 });
     const sprite = new THREE.Sprite(mat);
     sprite.position.copy(pos);
+    size *= 0.6;
     sprite.scale.setScalar(size);
     const light = new THREE.PointLight(color, intensity * 0.35, 50, 1.6);
     light.position.copy(pos);
@@ -263,7 +264,7 @@ export class Effects {
         for (let i = 0; i < 260 * (this.quality >= 2 ? 1 : 0.5); i++) {
           const a = Math.random() * Math.PI * 2;
           const s = rnd(10, 20);
-          this.norm.spawn({ x: p.x, y: 0.4, z: p.z, vx: Math.cos(a) * s, vy: rnd(0.5, 2), vz: Math.sin(a) * s, color: new THREE.Color(0.55, 0.5, 0.45), life: rnd(1, 1.8), size: rnd(1.2, 2.2), sizeEnd: 3.5, drag: 2.2, alpha: 0.45 });
+          this.norm.spawn({ x: p.x, y: 0.4, z: p.z, vx: Math.cos(a) * s, vy: rnd(0.5, 2), vz: Math.sin(a) * s, color: new THREE.Color(0.55, 0.5, 0.45), life: rnd(1, 1.8), size: rnd(1.0, 1.8), sizeEnd: 2.8, drag: 2.2, alpha: 0.3 });
         }
         this.burst(p, 300, [14, 26], WHITE, team, [0.3, 0.6], [0.4, 0.8], { drag: 2, shape: SHAPE_SPARK });
         break;
@@ -291,7 +292,7 @@ export class Effects {
         this.burst(p, 160, [3, 9], hot, team, [1.5, 3], [0.6, 1.3], { drag: 1.2 });
         for (let i = 0; i < 90; i++) {
           _v.randomDirection();
-          this.norm.spawn({ x: p.x, y: p.y, z: p.z, vx: _v.x * 6, vy: _v.y * 4 + 1, vz: _v.z * 6, color: new THREE.Color(0.35, 0.35, 0.4), life: rnd(1.5, 2.5), size: 2, sizeEnd: 5, drag: 1.5, alpha: 0.35 });
+          this.norm.spawn({ x: p.x, y: p.y, z: p.z, vx: _v.x * 6, vy: _v.y * 4 + 1, vz: _v.z * 6, color: new THREE.Color(0.35, 0.35, 0.4), life: rnd(1.5, 2.5), size: 1.6, sizeEnd: 4, drag: 1.5, alpha: 0.25 });
         }
       }
     }
