@@ -327,3 +327,4 @@ input, select { font-family: var(--font); font-weight: 600; }
 }
 .playlist-btn { position: absolute; right: 22px; bottom: 96px; }
 @media (max-width: 760px) { .playlist-btn { display: none; } }
+.fs-btn { font-size: 14px; padding: 5px 12px; letter-spacing: 1px; }

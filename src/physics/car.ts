@@ -308,8 +308,11 @@ export class Car {
     this.vel.y -= GRAVITY * dt;
 
     // ── boost ───────────────────────────────────────────────────────────
-    const wantsBoost = input.boost && this.boost > 0;
+    // on the ground, holding reverse always wins over boost so you can always back up
+    const reversing = this.wheelsInContact >= 2 && input.throttle < -0.1;
+    const wantsBoost = input.boost && this.boost > 0 && !reversing;
     if (wantsBoost && this.boostTime <= 0) this.boostTime = BOOST_MIN_TIME;
+    if (reversing) this.boostTime = 0;
     this.isBoosting = this.boost > 0 && (wantsBoost || this.boostTime > 0);
     if (this.isBoosting) {
       this.boost = Math.max(0, this.boost - BOOST_USE * dt);

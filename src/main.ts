@@ -184,6 +184,10 @@ class App {
 
   // ── input actions ────────────────────────────────────────────────────────
   private onAction(a: string) {
+    if (a === 'fullscreen') {
+      toggleFullscreen();
+      return;
+    }
     if (a === 'any') {
       audio.unlock();
       if (this.state === 'title') {
@@ -371,7 +375,7 @@ class App {
     const el = h('div', { id: 'title', class: 'screen vignette', onClick: () => this.onAction('any') },
       h('div', { class: 'logo' }, logoSvg(150), h('div', { class: 'word' }, h('span', null, GAME_NAME.split(' ')[0]), h('span', { class: 'l2' }, GAME_NAME.split(' ').slice(1).join(' ') || ''))),
       h('div', { class: 'press' }, 'PRESS ANY BUTTON TO START'),
-      h('div', { class: 'title-foot' }, 'Keyboard, mouse & gamepad supported · Best with headphones'),
+      h('div', { class: 'title-foot' }, 'Keyboard, mouse & gamepad supported · Best with headphones · F for fullscreen'),
     );
     this.show(el);
   }
@@ -612,7 +616,7 @@ class App {
       h('div', { class: 'card player-card' }, h('div', { class: 'avatar' }, a.name.slice(0, 1).toUpperCase()), h('div', null, h('div', { class: 'nm' }, a.name), h('div', { class: 'lv' }, `Level ${level} · ${st.wins ?? 0} wins`))),
       np,
       plBtn,
-      h('div', { class: 'top-right' }, this.offlineOnly ? h('span', { class: 'badge denied' }, 'offline') : h('span', { class: 'badge approved' }, 'online'), a.is_admin ? h('span', { class: 'badge admin' }, 'admin') : null),
+      h('div', { class: 'top-right' }, fullscreenButton(), this.offlineOnly ? h('span', { class: 'badge denied' }, 'offline') : h('span', { class: 'badge approved' }, 'online'), a.is_admin ? h('span', { class: 'badge admin' }, 'admin') : null),
     );
     this.show(el);
     this.renderNowPlaying();
@@ -766,6 +770,7 @@ class App {
       btn('Resume', () => this.togglePause()),
       s.kind !== 'client' && !s.settings.freeplay ? btn('Restart match', () => { this.togglePause(); s.rematch(); }) : null,
       btn(this.view.ballCam ? 'Ball cam: ON' : 'Ball cam: OFF', () => { this.view.ballCam = !this.view.ballCam; this.togglePause(); }),
+      btn(document.fullscreenElement ? 'Exit fullscreen' : 'Fullscreen', () => { toggleFullscreen(); this.togglePause(); }),
       btn('Options', () => { this.togglePause(); this.showOptions(true); }),
       btn(s.kind === 'host' ? 'End match for everyone' : 'Leave match', () => this.endSession(), 'red'),
     ));
@@ -1181,6 +1186,18 @@ class App {
     this.show(panel.el);
     void panel.open();
   }
+}
+
+function toggleFullscreen() {
+  if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+  else void document.documentElement.requestFullscreen({ navigationUI: 'hide' }).catch(() => toast('Fullscreen is not available in this browser', true));
+}
+
+function fullscreenButton() {
+  const b = h('button', { class: 'icon-btn fs-btn', title: 'Fullscreen (F)', onClick: () => toggleFullscreen() }, document.fullscreenElement ? '⤡ Exit fullscreen' : '⤢ Fullscreen');
+  const sync = () => (b.textContent = document.fullscreenElement ? '⤡ Exit fullscreen' : '⤢ Fullscreen');
+  document.addEventListener('fullscreenchange', sync);
+  return b;
 }
 
 (window as unknown as { __bl: App }).__bl = new App();

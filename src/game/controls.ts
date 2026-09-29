@@ -1,6 +1,6 @@
 import { emptyInput, type CarInput } from '../physics/input';
 
-export type Action = 'ballcam' | 'pause' | 'scoreboard' | 'scoreboardUp' | 'chat' | 'quick1' | 'quick2' | 'quick3' | 'quick4' | 'skip' | 'any';
+export type Action = 'fullscreen' | 'ballcam' | 'pause' | 'scoreboard' | 'scoreboardUp' | 'chat' | 'quick1' | 'quick2' | 'quick3' | 'quick4' | 'skip' | 'any';
 
 export const KEY_HELP: [string, string][] = [
   ['W / S', 'Throttle / reverse · pitch in the air'],
@@ -12,7 +12,8 @@ export const KEY_HELP: [string, string][] = [
   ['C', 'Toggle ball cam'],
   ['Tab', 'Scoreboard'],
   ['T', 'Chat · 1-4 quick chat'],
-  ['Esc', 'Pause menu'],
+  ['P (or Esc)', 'Pause menu'],
+  ['F', 'Toggle fullscreen'],
 ];
 export const PAD_HELP: [string, string][] = [
   ['RT / LT', 'Throttle / reverse'],
@@ -46,7 +47,7 @@ export class Controls {
       this.lastDevice = 'keyboard';
       if (!e.repeat) {
         this.onAction?.('any');
-        const map: Record<string, Action> = { KeyC: 'ballcam', Escape: 'pause', Tab: 'scoreboard', KeyT: 'chat', Digit1: 'quick1', Digit2: 'quick2', Digit3: 'quick3', Digit4: 'quick4', Space: 'skip' };
+        const map: Record<string, Action> = { KeyC: 'ballcam', KeyP: 'pause', Escape: 'pause', KeyF: 'fullscreen', Tab: 'scoreboard', KeyT: 'chat', Digit1: 'quick1', Digit2: 'quick2', Digit3: 'quick3', Digit4: 'quick4', Space: 'skip' };
         const a = map[e.code];
         if (a) this.onAction?.(a);
       }

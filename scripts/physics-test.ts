@@ -230,6 +230,18 @@ for (const [label, yawB, fast] of [['rear-end', 0, true], ['head-on', Math.PI, t
   w.explode(0, 2, 50, 42, 30);
   check('goal blast launches nearby cars', near.vel.length() > 12 && near.vel.z < -5 && near.vel.y > 3 && far.vel.length() < 0.01, 'near v=' + f(near.vel) + ' far v=' + f(far.vel));
 }
+// 13e. reverse always works on the ground, even with boost held
+{
+  const { w, car } = fresh();
+  car.reset(0, -30, 0);
+  car.boost = 100;
+  const inp = emptyInput();
+  inp.throttle = -1;
+  inp.boost = true;
+  for (let i = 0; i < 180; i++) w.step([inp]);
+  const fs = car.vel.dot(car.forward(new Vector3()));
+  check('reverse wins over boost on the ground', fs < -8 && car.boost === 100, 'fwdSpeed=' + fs.toFixed(2) + ' boost=' + car.boost.toFixed(0));
+}
 // 14. perf
 {
   const w = new World();
