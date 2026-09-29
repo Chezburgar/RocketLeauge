@@ -7,9 +7,10 @@ A browser car-soccer game in the spirit of Rocket League, with a semi-low-poly l
 ## Features
 
 - **Physics (120 Hz, custom):** the arena is a smooth signed-distance field with ramps, walls, ceiling and goals, so you can drive up walls and across the ceiling. Cars have suspension, throttle and steering curves, powerslide, jump, double jump, dodges/flips (with flip cancel), air pitch/yaw/roll, free air roll, boost, supersonic, bumps and demolitions. Car touches add extra impulse to the ball, and all 34 boost pads work.
-- **Cosmetics:** 4 original car bodies, team shades plus a custom accent colour, 5 wheel styles, 6 toppers, 7 boost trails, and 8 goal explosions (Classic, Fireworks, Singularity, Electroshock, Confetti, Voxel, Shockwave, Inferno). Your goal anthem plays for everyone when you score, and the MVP's anthem plays at the end of the match.
+- **Cosmetics:** 4 original low-poly car bodies (Breaker, Wedge, Titan, Viper) with glass cabins, flared arches, lights and body-specific wings/fins/bumpers, team shades plus a custom accent colour, 5 wheel styles, 6 toppers, 7 boost trails, and 8 goal explosions (Classic, Fireworks, Singularity, Electroshock, Confetti, Voxel, Shockwave, Inferno). Your goal anthem plays for everyone when you score, and the MVP's anthem plays at the end of the match.
 - **Anthems:** the 10 *Echo Fanfare* anthems you attached are bundled. The admin can upload more, and they show up in everyone's Garage.
 - **Matches:** kickoff countdown with random kickoff spots, clock, overtime, goal replays (skippable), scoreboard, MVP, saves/shots/assists, quick chat and chat, crowd reactions, and synthesized sound effects.
+- **Bots:** they follow the ball's predicted path, decide who challenges by time-to-ball, and rotate between attacker, support and keeper. They aim shots on target, clear to the side walls when defending, steer around the ball instead of knocking it into their own net, and use timed jump shots, double jumps, dodges, boost pads and the odd demo. All-Stars also go for aerials. Rookie, Pro and All-Star differ in reaction time, aim, boost use and which mechanics they use. `npx tsx scripts/bot-eval.ts [games] [skillA] [skillB]` plays bot-vs-bot matches.
 - **Modes:** Online rooms (1v1/2v2/3v3, public or private, bots fill empty spots, join mid-match), Exhibition vs bots (Rookie/Pro/All-Star), and Free Play.
 - **Accounts:** tied to the device, with no email and no password. New players choose a name and request access, and the admin approves them.
 - **Admin panel:** approve/deny requests, manage players (revoke, ban, rename, promote to admin, delete), upload songs, build main-menu playlists (in order, shuffle, or radio-sync where everyone hears the same moment), choose the live playlist, and upload custom anthems.
@@ -35,7 +36,8 @@ A browser car-soccer game in the spirit of Rocket League, with a semi-low-poly l
 | C | Y | Toggle ball cam |
 | Tab | Back | Scoreboard |
 | T, 1-4 | | Chat, quick chat |
-| Esc | Start | Menu |
+| P / Esc | Start | Pause menu |
+| F | | Fullscreen |
 
 Camera (FOV, distance, height, angle, stiffness, swivel, shake), graphics quality, and volumes are under **Options**.
 
