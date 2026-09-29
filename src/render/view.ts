@@ -6,6 +6,7 @@ import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { SMAAPass } from 'three/examples/jsm/postprocessing/SMAAPass.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { BALL_RADIUS, DT } from '../physics/constants';
+import { arenaNormal, arenaSDF } from '../physics/arena';
 import { MAX_CARS } from '../physics/world';
 import { TEAM_COLORS, type Loadout } from '../game/types';
 import { buildArena, type ArenaRefs } from './arena';
@@ -408,49 +409,7 @@ export class GameView {
         break;
       }
       case 'car': {
-        const car = f.cars[this.focusSlot];
-        if (!car.present || car.demolished) {
-          // demolished: hold position and watch the ball
-          this.camLook.lerp(f.ballPos, 1 - Math.exp(-dt * 3));
-          break;
-        }
-        const carUp = _v3.set(0, 1, 0).applyQuaternion(car.quat);
-        // camera up follows the surface while driving, world-up in the air
-        const targetUp = car.wheelsInContact >= 3 && !car.demolished ? carUp : WORLD_UP;
-        this.camUp.lerp(targetUp, 1 - Math.exp(-dt * 5)).normalize();
-        const up = this.camUp;
-        // ball cam follows the ball – or, right after a goal, the spot where it exploded
-        const tgt = !this.ballHidden && f.ballVisible ? f.ballPos : this.explosionFocus;
-        let dir: THREE.Vector3;
-        if (this.ballCam && tgt) {
-          dir = _v.subVectors(car.pos, tgt);
-          dir.addScaledVector(up, -dir.dot(up) * 0.85);
-          if (dir.lengthSq() < 1e-4) dir.set(0, 0, -1);
-          dir.normalize();
-        } else {
-          const fwd = _v.set(1, 0, 0).applyQuaternion(car.quat);
-          if (car.wheelsInContact < 3 && car.vel.lengthSq() > 16) fwd.copy(car.vel).normalize().lerp(_v2.set(1, 0, 0).applyQuaternion(car.quat), 0.5);
-          fwd.addScaledVector(up, -fwd.dot(up));
-          if (fwd.lengthSq() < 1e-4) fwd.set(0, 0, 1);
-          dir = fwd.normalize().negate();
-        }
-        const desired = _v2.copy(car.pos).addScaledVector(dir, cs.distance).addScaledVector(up, cs.height);
-        const k = 8 + cs.stiffness * 40;
-        this.camPos.lerp(desired, 1 - Math.exp(-dt * k));
-        // keep the camera inside the arena-ish (don't clip through the floor)
-        if (this.camPos.y < 0.3) this.camPos.y = 0.3;
-        let look: THREE.Vector3;
-        if (this.ballCam && tgt) {
-          look = _v.copy(tgt);
-          // don't let the view swing too high: blend towards a point ahead of the car
-          const ahead = _v3.copy(car.pos).addScaledVector(dir, -4).addScaledVector(up, 0.6);
-          const toBall = look.clone().sub(this.camPos).normalize();
-          const vertical = toBall.dot(up);
-          if (vertical > 0.35) look.lerp(ahead, THREE.MathUtils.clamp((vertical - 0.35) * 2, 0, 0.8));
-        } else {
-          look = _v.copy(car.pos).addScaledVector(dir, -4).addScaledVector(up, cs.height * 0.4 + Math.tan(THREE.MathUtils.degToRad(cs.angle)) * 4);
-        }
-        this.camLook.lerp(look, 1 - Math.exp(-dt * (cs.swivel * 3 + 6)));
+        this.updateCarCamera(f, dt);
         break;
       }
     }
@@ -463,11 +422,148 @@ export class GameView {
     }
     cam.up.copy(this.camUp);
     cam.lookAt(this.camLook);
-    if (this.camMode === 'car') {
-      // tilt down by the configured angle
-      cam.rotateX(THREE.MathUtils.degToRad(this.camSettings.angle * 0.25));
+  }
+
+  /**
+   * Car / ball camera: an orbit rig around the car.
+   *  - yaw follows the car's heading (car cam) or the direction to the ball (ball cam)
+   *  - pitch follows the ball height in ball cam, but the camera pivots around the car so
+   *    the car always stays on screen
+   *  - "up" follows the floor and walls but never the ceiling, so the view is never upside down
+   *  - the camera is kept inside the arena so it can't look through walls
+   */
+  private updateCarCamera(f: Frame, dt: number) {
+    const cs = this.camSettings;
+    const car = f.cars[this.focusSlot];
+    if (!car.present || car.demolished) {
+      // demolished: hold position and watch the ball
+      this.camLook.lerp(f.ballPos, 1 - Math.exp(-dt * 3));
+      return;
+    }
+    const rig = this.rig;
+    // snap everything after a teleport (kickoff / respawn / first frame)
+    const teleported = !rig.init || rig.lastPos.distanceToSquared(car.pos) > 36;
+    rig.lastPos.copy(car.pos);
+
+    // ── surface up: the camera sits "above" the car relative to the floor, wall or ceiling ──
+    const carUp = rig.tmpA.set(0, 1, 0).applyQuaternion(car.quat);
+    const grounded = car.wheelsInContact >= 3;
+    const upTarget = grounded ? carUp : WORLD_UP;
+    if (teleported) rig.up.copy(upTarget);
+    else rig.up.lerp(upTarget, 1 - Math.exp(-dt * 4));
+    if (rig.up.lengthSq() < 1e-4) rig.up.copy(WORLD_UP);
+    rig.up.normalize();
+    const up = rig.up;
+    // view up: roll with floors and walls, but never turn the picture upside down
+    const flipT = THREE.MathUtils.clamp(-up.y / 0.4, 0, 1);
+    rig.viewUp.copy(up).lerp(WORLD_UP, flipT);
+    if (rig.viewUp.lengthSq() < 1e-4) rig.viewUp.copy(WORLD_UP);
+    rig.viewUp.normalize();
+
+    // ── heading (yaw) on the plane perpendicular to up ──
+    const tgt = !this.ballHidden && f.ballVisible ? f.ballPos : this.explosionFocus;
+    const useBall = this.ballCam && !!tgt;
+    const fwd = rig.tmpB.set(1, 0, 0).applyQuaternion(car.quat);
+    const heading = rig.tmpC;
+    let havePitchTarget = false;
+    let pitchTarget = THREE.MathUtils.degToRad(cs.angle);
+    if (useBall) {
+      heading.subVectors(tgt!, car.pos);
+      const vert = heading.dot(up);
+      heading.addScaledVector(up, -vert);
+      const flat = heading.length();
+      if (flat > 0.6) {
+        heading.multiplyScalar(1 / flat);
+        // look up/down at the ball, pivoting around the car
+        pitchTarget = THREE.MathUtils.clamp(Math.atan2(vert - 0.6, flat) * 0.8, -0.3, 0.75);
+        havePitchTarget = true;
+      } else heading.copy(rig.dir); // ball straight overhead: keep the current yaw
+    } else {
+      heading.copy(fwd);
+      if (!grounded) {
+        // in the air follow where the car is travelling so flips don't spin the camera
+        const vFlat = rig.tmpA.copy(car.vel).addScaledVector(up, -car.vel.dot(up));
+        if (vFlat.lengthSq() > 9 && car.vel.dot(fwd) > -1) heading.copy(vFlat);
+      }
+      heading.addScaledVector(up, -heading.dot(up));
+      if (heading.lengthSq() < 0.04) heading.copy(rig.dir); // nose straight up/down: keep yaw
+      heading.normalize();
+    }
+    if (teleported || rig.dir.lengthSq() < 0.5) rig.dir.copy(heading);
+    else {
+      // swivel: rotate the current yaw towards the target at a speed set by "swivel speed"
+      rig.dir.addScaledVector(up, -rig.dir.dot(up));
+      if (rig.dir.lengthSq() < 1e-4) rig.dir.copy(heading);
+      rig.dir.normalize();
+      const k = 1 - Math.exp(-dt * (3 + cs.swivel * 1.6));
+      if (rig.dir.dot(heading) < -0.95) rig.dir.addScaledVector(rig.tmpA.crossVectors(up, rig.dir), 0.2); // avoid the 180° dead spot
+      rig.dir.lerp(heading, k).normalize();
+    }
+    if (grounded) {
+      // looking up pivots the camera down towards the surface – stop before it hits it
+      const maxUp = Math.asin(THREE.MathUtils.clamp((cs.height - 0.05) / cs.distance, 0, 1));
+      pitchTarget = Math.min(pitchTarget, maxUp);
+    }
+    if (teleported || !havePitchTarget) rig.pitch += (pitchTarget - rig.pitch) * (teleported ? 1 : 1 - Math.exp(-dt * 6));
+    else rig.pitch += (pitchTarget - rig.pitch) * (1 - Math.exp(-dt * 5));
+    rig.init = true;
+
+    // ── place the camera: orbit around the car ──
+    const lookDir = rig.tmpB.copy(rig.dir).multiplyScalar(Math.cos(rig.pitch)).addScaledVector(up, Math.sin(rig.pitch));
+    const speed = car.vel.length();
+    const dist = cs.distance + speed * (1 - cs.stiffness) * 0.03;
+    const pivot = rig.tmpA.copy(car.pos).addScaledVector(up, 0.25);
+    const desired = rig.tmpC.copy(pivot).addScaledVector(lookDir, -dist).addScaledVector(up, cs.height);
+    // stay inside the arena: slide out along the floor / wall instead of clipping through it…
+    for (let i = 0; i < 3; i++) {
+      const d = arenaSDF(desired.x, desired.y, desired.z);
+      if (d >= 0.45) break;
+      arenaNormal(desired.x, desired.y, desired.z, rig.tmpD);
+      desired.addScaledVector(rig.tmpD, 0.45 - d);
+    }
+    // …and never end up on the far side of a wall from the car
+    this.clampLineOfSight(pivot, desired, 0.15);
+    if (teleported) this.camPos.copy(desired);
+    else this.camPos.lerp(desired, 1 - Math.exp(-dt * 30));
+
+    // keep the car on screen: if the view points too far away from it, turn towards it just enough
+    const halfV = THREE.MathUtils.degToRad(this.camera.fov / 2) - 0.14;
+    const toCar = rig.tmpD.subVectors(car.pos, this.camPos);
+    if (toCar.lengthSq() > 0.09) {
+      toCar.normalize();
+      const ang = Math.acos(THREE.MathUtils.clamp(lookDir.dot(toCar), -1, 1));
+      if (ang > halfV) lookDir.lerp(toCar, (ang - halfV) / ang).normalize();
+    }
+    this.camLook.copy(this.camPos).addScaledVector(lookDir, 10);
+    this.camUp.copy(rig.viewUp);
+  }
+
+  /** If the straight line from `from` to `pos` leaves the arena, pull `pos` back to the last clear point. */
+  private clampLineOfSight(from: THREE.Vector3, pos: THREE.Vector3, margin: number) {
+    const d = this.rig.tmpE.subVectors(pos, from);
+    const steps = 12;
+    for (let i = 1; i <= steps; i++) {
+      const t = i / steps;
+      if (arenaSDF(from.x + d.x * t, from.y + d.y * t, from.z + d.z * t) < margin) {
+        pos.copy(from).addScaledVector(d, Math.max(0, (i - 1) / steps));
+        return;
+      }
     }
   }
+
+  private rig = {
+    init: false,
+    dir: new THREE.Vector3(0, 0, 1),
+    up: new THREE.Vector3(0, 1, 0),
+    viewUp: new THREE.Vector3(0, 1, 0),
+    pitch: 0,
+    lastPos: new THREE.Vector3(),
+    tmpA: new THREE.Vector3(),
+    tmpB: new THREE.Vector3(),
+    tmpC: new THREE.Vector3(),
+    tmpD: new THREE.Vector3(),
+    tmpE: new THREE.Vector3(),
+  };
 
   snapCamera() {
     this.camPos.copy(this.camera.position);
