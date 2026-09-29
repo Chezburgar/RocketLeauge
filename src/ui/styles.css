@@ -325,3 +325,5 @@ input, select { font-family: var(--font); font-weight: 600; }
   .player-card { bottom: 10px; }
   .now-playing { bottom: 10px; }
 }
+.playlist-btn { position: absolute; right: 22px; bottom: 96px; }
+@media (max-width: 760px) { .playlist-btn { display: none; } }

@@ -86,6 +86,20 @@ class App {
     try {
       const c = await api.publicContent();
       setCustomAnthems(c.anthems ?? []);
+      // the player may have picked their own playlist in the main menu
+      const choice = localStorage.getItem('bl.playlist') ?? 'live';
+      if (choice === 'theme') {
+        audio.music.setPlaylist('Built-in theme', [], 'order', 0);
+        return;
+      }
+      if (choice !== 'live') {
+        const pl = (await api.publicPlaylists().catch(() => [])).find((p) => p.id === choice);
+        if (pl && pl.songs.length) {
+          const tracks: Track[] = pl.songs.map((s) => ({ id: s.id, title: s.title, artist: s.artist, url: publicUrl(s.path), duration: s.duration ?? undefined }));
+          audio.music.setPlaylist(pl.name, tracks, pl.mode === 'radio' ? 'order' : pl.mode, 0);
+          return;
+        }
+      }
       if (c.menu && c.menu.songs.length) {
         const tracks: Track[] = c.menu.songs.map((s) => ({ id: s.id, title: s.title, artist: s.artist, url: publicUrl(s.path), duration: s.duration ?? undefined }));
         audio.music.setPlaylist(c.menu.playlist.name, tracks, c.menu.playlist.mode, new Date(c.menu.epoch).getTime());
@@ -594,15 +608,42 @@ class App {
       h('div', { class: 'meta' }),
       h('button', { class: 'icon-btn', title: 'Skip song', onClick: () => audio.music.skip() }, '⏭'),
     );
+    const plBtn = btn('♫ Select playlist', () => void this.showPlaylistPicker(), 'sm');
+    plBtn.classList.add('playlist-btn');
     const el = h('div', { id: 'main', class: 'screen shade-left' },
       h('div', { class: 'menu-brand' }, logoSvg(48), GAME_NAME),
       h('div', { class: 'menu-left' }, ...items),
       h('div', { class: 'card player-card' }, h('div', { class: 'avatar' }, a.name.slice(0, 1).toUpperCase()), h('div', null, h('div', { class: 'nm' }, a.name), h('div', { class: 'lv' }, `Level ${level} · ${st.wins ?? 0} wins`))),
       np,
+      plBtn,
       h('div', { class: 'top-right' }, this.offlineOnly ? h('span', { class: 'badge denied' }, 'offline') : h('span', { class: 'badge approved' }, 'online'), a.is_admin ? h('span', { class: 'badge admin' }, 'admin') : null),
     );
     this.show(el);
     this.renderNowPlaying();
+  }
+
+  private async showPlaylistPicker() {
+    const current = localStorage.getItem('bl.playlist') ?? 'live';
+    const list = h('div', { class: 'pl-list' }, h('div', { class: 'spinner' }));
+    const overlay = h('div', { class: 'screen', style: 'background:rgba(0,0,0,0.55)', onClick: (e: Event) => { if (e.target === overlay) overlay.remove(); } },
+      h('div', { class: 'card pause-menu', style: 'width:420px' }, h('h2', null, 'MENU MUSIC'), list, btn('Close', () => overlay.remove(), 'ghost')));
+    this.ui.appendChild(overlay);
+    const pick = (id: string) => {
+      localStorage.setItem('bl.playlist', id);
+      overlay.remove();
+      void this.loadContent().then(() => audio.music.start());
+    };
+    const item = (id: string, label: string, sub: string) =>
+      h('div', { class: 'pl-item' + (current === id ? ' on' : ''), onClick: () => pick(id) }, h('span', null, label, h('span', { class: 'small' }, '  ' + sub)));
+    let pls: Awaited<ReturnType<typeof api.publicPlaylists>> = [];
+    try {
+      pls = await api.publicPlaylists();
+    } catch {
+      /* offline */
+    }
+    clear(list);
+    list.append(item('live', 'Live playlist', '· chosen by the admin'), item('theme', 'Built-in theme', '· generative'));
+    for (const p of pls) if (p.songs.length) list.appendChild(item(p.id, p.name, `· ${p.songs.length} songs`));
   }
 
   private subScreen(title: string, onBack: () => void, ...content: (HTMLElement | null)[]) {

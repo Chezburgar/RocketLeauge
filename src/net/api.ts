@@ -90,6 +90,9 @@ export const api = {
   async publicContent(): Promise<PublicContent> {
     return rpc<PublicContent>('rl_public_content');
   },
+  async publicPlaylists(): Promise<{ id: string; name: string; mode: 'order' | 'shuffle' | 'radio'; songs: { id: string; title: string; artist: string; path: string; duration: number | null }[] }[]> {
+    return rpc('rl_public_playlists');
+  },
 
   // ── admin: players ──────────────────────────────────────────────────────
   admin: {
