@@ -88,11 +88,7 @@ class App {
       setCustomAnthems(c.anthems ?? []);
       // the player may have picked their own playlist in the main menu
       const choice = localStorage.getItem('bl.playlist') ?? 'live';
-      if (choice === 'theme') {
-        audio.music.setPlaylist('Built-in theme', [], 'order', 0);
-        return;
-      }
-      if (choice !== 'live') {
+      if (choice !== 'live' && choice !== 'theme') {
         const pl = (await api.publicPlaylists().catch(() => [])).find((p) => p.id === choice);
         if (pl && pl.songs.length) {
           const tracks: Track[] = pl.songs.map((s) => ({ id: s.id, title: s.title, artist: s.artist, url: publicUrl(s.path), duration: s.duration ?? undefined }));
@@ -642,8 +638,9 @@ class App {
       /* offline */
     }
     clear(list);
-    list.append(item('live', 'Live playlist', '· chosen by the admin'), item('theme', 'Built-in theme', '· generative'));
-    for (const p of pls) if (p.songs.length) list.appendChild(item(p.id, p.name, `· ${p.songs.length} songs`));
+    const withSongs = pls.filter((p) => p.songs.length);
+    if (!withSongs.length) list.appendChild(h('div', { class: 'empty-state' }, 'No playlists yet.'));
+    for (const p of withSongs) list.appendChild(item(p.id, p.name, `· ${p.songs.length} songs`));
   }
 
   private subScreen(title: string, onBack: () => void, ...content: (HTMLElement | null)[]) {
