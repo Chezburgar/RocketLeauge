@@ -78,6 +78,15 @@ export const DODGE_DEADZONE = 0.5;
 export const FLIP_TORQUE_TIME = 0.65;
 export const FLIP_Z_DAMP_TIME = 0.15;
 export const FLIP_Z_DAMP = 0.35; // fraction removed per 1/120 s while damping
+export const FLIP_Z_DAMP_END = 0.21; // falling is damped until then
+/** flips started closer than this to the floor hop so they finish the turn in the air */
+export const FLIP_LOW_HEIGHT = 1.2;
+export const FLIP_LOW_AIR_TIME = 0.72;
+export const FLIP_LOW_AIR_TIME_BACK = 0.82;
+/** the flip spin eases off over the last part of the turn (rad) */
+export const FLIP_EASE_ANGLE = 0.6;
+/** a flip that hasn't finished its turn by now (e.g. cancelled) ends anyway */
+export const FLIP_MAX_TIME = 0.8;
 export const FLIP_INITIAL_VEL = 5.0;
 export const FLIP_FORWARD_SCALE = 1.0;
 export const FLIP_SIDE_SCALE = 1.9;
@@ -93,6 +102,8 @@ export const AIR_YAW_DAMP = 1.886;
 export const AIR_ROLL_DAMP = 4.1;
 
 export const STICKY_FORCE_SCALE = 0.5;
+/** most sideways grip one tyre can apply per tick (N·s): about 6 g of cornering per wheel */
+export const LAT_IMPULSE_MAX = 22;
 
 // suspension
 export const SUSP_STIFFNESS = 30000;

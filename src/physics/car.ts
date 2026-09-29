@@ -24,17 +24,24 @@ import {
   DOUBLEJUMP_WINDOW,
   FLIP_ANG_SPEED,
   FLIP_BACKWARD_SCALE,
+  FLIP_EASE_ANGLE,
   FLIP_FORWARD_SCALE,
   FLIP_INITIAL_VEL,
+  FLIP_LOW_AIR_TIME,
+  FLIP_LOW_AIR_TIME_BACK,
+  FLIP_LOW_HEIGHT,
+  FLIP_MAX_TIME,
   FLIP_SIDE_SCALE,
   FLIP_TORQUE_TIME,
   FLIP_Z_DAMP,
+  FLIP_Z_DAMP_END,
   FLIP_Z_DAMP_TIME,
   GRAVITY,
   JUMP_HOLD_ACCEL,
   JUMP_IMPULSE,
   JUMP_MAX_TIME,
   JUMP_MIN_TIME,
+  LAT_IMPULSE_MAX,
   MAX_ANG_SPEED,
   MAX_CAR_SPEED,
   POWERSLIDE_STEER_CURVE,
@@ -117,6 +124,7 @@ const _hc = new Vector3();
 const _hqi = new Quaternion();
 const _hqi2 = new Quaternion();
 const _e = new Vector3();
+const _lf = new Vector3();
 
 export interface WheelContact {
   inContact: boolean;
@@ -147,6 +155,11 @@ export class Car {
   flipSide = 0;
   /** rotation accumulated by the current flip (rad) */
   flipAngle = 0;
+  /**
+   * After a flip, the stick direction that started it is ignored until it's released or the car
+   * lands (bit 1 = pitch, bit 2 = yaw), so holding W / S / A / D doesn't keep spinning the car.
+   */
+  flipLock = 0;
   prevJump = false;
   autoFlipTime = 0;
   autoFlipDir = 0;
@@ -301,6 +314,7 @@ export class Car {
       this.hasDoubleJumped = false;
       this.hasFlipped = false;
       this.isFlipping = false;
+      this.flipLock = 0;
       this.airTime = 0;
     }
 
@@ -353,12 +367,18 @@ export class Car {
       const wheelShare = this.wheelsInContact / 4;
       const throttle = this.isBoosting ? 1 : input.throttle;
       let accel = 0;
+      // braking / coasting only slow the car down; throttle can always drive it
+      let slowing = false;
       if (Math.abs(throttle) > 0.01) {
         const sameDir = forwardSpeed * throttle >= 0 || Math.abs(forwardSpeed) < 0.25;
         if (sameDir) accel = throttle * curve(THROTTLE_CURVE, Math.abs(forwardSpeed));
-        else accel = -Math.sign(forwardSpeed) * BRAKE_ACCEL;
+        else {
+          accel = -Math.sign(forwardSpeed) * BRAKE_ACCEL;
+          slowing = true;
+        }
       } else if (Math.abs(forwardSpeed) > 0.01) {
         accel = -Math.sign(forwardSpeed) * Math.min(COAST_DECEL, Math.abs(forwardSpeed) / dt);
+        slowing = true;
       }
       if (this.isBoosting && accel < 0) accel = 0;
       // handbrake adds a bit of longitudinal drag
@@ -368,7 +388,7 @@ export class Car {
       _a.copy(fwd).addScaledVector(_avgN, -fwd.dot(_avgN)).normalize();
       const fs = this.vel.dot(_a);
       const dv = accel * dt * wheelShare;
-      if (dv * fs < 0 && Math.sign(fs + dv) !== Math.sign(fs)) {
+      if (slowing && dv * fs < 0 && Math.sign(fs + dv) !== Math.sign(fs)) {
         // brakes / coasting stop the car but never reverse it within a tick
         this.vel.addScaledVector(_a, -fs);
       } else this.vel.addScaledVector(_a, dv);
@@ -398,7 +418,9 @@ export class Car {
           // apply at the centre-of-mass height so cornering never rolls the car over
           _d.addScaledVector(up, _c.subVectors(this.pos, _d).dot(up));
           const m = this.effectiveMass(_d, _a);
-          const j = (-latSpeed * m * friction) / (iter === 0 ? 1 : 2);
+          let j = (-latSpeed * m * friction) / (iter === 0 ? 1 : 2);
+          // a tyre can only grip so hard: landing sideways skids instead of spinning the car
+          j = Math.max(-LAT_IMPULSE_MAX, Math.min(LAT_IMPULSE_MAX, j));
           _n.copy(_a).multiplyScalar(j);
           this.applyImpulse(_n, _d);
         }
@@ -434,8 +456,14 @@ export class Car {
       this.hasJumped = true;
       this.jumpTime = 0;
       this.airTime = 0;
-    } else if (!grounded && jumpPressed && this.bodyContact && this.wheelsInContact === 0 && this.autoFlipTime <= 0) {
-      // turtle / on-side recovery ("auto flip")
+    } else if (
+      !grounded &&
+      this.bodyContact &&
+      this.autoFlipTime <= 0 &&
+      (this.wheelsInContact === 0 || up.y < 0.7) &&
+      (jumpPressed || (Math.abs(input.throttle) > 0.5 && up.y < 0.7 && !this.isFlipping && this.vel.lengthSq() < 16 && this.angVel.lengthSq() < 4))
+    ) {
+      // on the roof / side / nose: jump, or just keep driving, to get back on the wheels
       this.autoFlipTime = 0.8;
       // roll towards whichever side brings the roof up fastest
       this.autoFlipDir = right.y > 0 ? 1 : -1;
@@ -468,44 +496,45 @@ export class Car {
     // ── flip ────────────────────────────────────────────────────────────
     if (this.hasFlipped) this.flipTime += dt;
     if (this.isFlipping) {
-      // track how far we've rotated about the flip axis; stop after one full turn
+      // spin about the flip axis (car frame: roll about x, pitch about z) for one turn
       _qi.copy(this.quat).invert();
       const wlf = _b.copy(this.angVel).applyQuaternion(_qi);
       const axLen = Math.hypot(this.flipSide, this.flipFwd) || 1;
-      const rate = (wlf.x * this.flipSide - wlf.z * this.flipFwd) / axLen;
+      const ax = this.flipSide / axLen;
+      const az = -this.flipFwd / axLen;
+      const rate = wlf.x * ax + wlf.z * az;
       this.flipAngle += Math.max(0, rate) * dt;
-      if (this.flipAngle >= Math.PI * 2 * 0.96) {
-        // done: remove most of the spin about the flip axis
-        wlf.x -= (this.flipSide / axLen) * rate * 0.9;
-        wlf.z += (this.flipFwd / axLen) * rate * 0.9;
+      const left = Math.PI * 2 - this.flipAngle;
+      if (left <= 0.03) {
+        // one full turn: stop the spin and ignore the held direction until it's released
+        if (ax !== 0) wlf.x = 0;
+        if (az !== 0) wlf.z = 0;
         this.angVel.copy(wlf.applyQuaternion(this.quat));
         this.isFlipping = false;
         this.flipTime = Math.max(this.flipTime, FLIP_TORQUE_TIME);
-      }
-    }
-    if (this.isFlipping) {
-      if (this.flipTime < FLIP_TORQUE_TIME) {
-        // local angular accel: roll about +x, pitch about +z
-        // pulling the stick against a front/back flip cancels the pitch spin ("flip cancel")
-        let pitchScale = 1;
-        if (this.flipFwd !== 0 && input.pitch * this.flipFwd < 0) pitchScale = 1 - Math.min(1, Math.abs(input.pitch));
-        _a.set(this.flipSide * 260, 0, -this.flipFwd * 224 * pitchScale).multiplyScalar(dt);
-        _a.applyQuaternion(this.quat);
-        this.angVel.add(_a);
-        if (pitchScale < 1) {
-          // actively damp existing pitch rotation while cancelling
-          const wl = _b.copy(this.angVel).applyQuaternion(_qi.copy(this.quat).invert());
-          wl.z *= 1 - (1 - pitchScale) * 0.2;
-          this.angVel.copy(wl.applyQuaternion(this.quat));
-        }
+        this.flipLock = (this.flipFwd !== 0 ? 1 : 0) | (this.flipSide !== 0 ? 2 : 0);
+      } else if (this.flipTime < FLIP_MAX_TIME) {
+        // full speed, easing off over the last part of the turn so it settles instead of snapping
+        const target = FLIP_ANG_SPEED * Math.min(1, Math.max(0.35, left / FLIP_EASE_ANGLE));
+        // pulling the stick against a front/back flip cancels its pitch ("flip cancel")
+        const cancel = this.flipFwd !== 0 && input.pitch * this.flipFwd < 0 ? Math.min(1, Math.abs(input.pitch)) : 0;
+        if (ax !== 0) wlf.x = ax * target;
+        if (az !== 0) wlf.z = az * target * (1 - cancel);
+        this.angVel.copy(wlf.applyQuaternion(this.quat));
       } else {
         this.isFlipping = false;
       }
-      // flips "hover": vertical velocity is damped at the start and whenever falling during the flip
-      if (this.flipTime < FLIP_Z_DAMP_TIME || (this.vel.y < 0 && this.flipTime < FLIP_TORQUE_TIME)) {
+    }
+    if (this.isFlipping && !this.lowFlip()) {
+      // high up, flips damp the vertical velocity briefly (from low down the take-off hop handles it)
+      if (this.flipTime < FLIP_Z_DAMP_TIME || (this.vel.y < 0 && this.flipTime < FLIP_Z_DAMP_END)) {
         this.vel.y *= Math.pow(1 - FLIP_Z_DAMP, dt * 120);
       }
     }
+
+    // a locked flip direction unlocks once the stick / key is let go
+    if (this.flipLock & 1 && Math.abs(input.pitch) < 0.1) this.flipLock &= ~1;
+    if (this.flipLock & 2 && Math.abs(input.yaw) < 0.1) this.flipLock &= ~2;
 
     // ── air control ─────────────────────────────────────────────────────
     if (!anyContact) {
@@ -516,15 +545,18 @@ export class Car {
         yaw = 0;
       }
       let pitch = input.pitch;
-      if (this.isFlipping && this.flipTime < FLIP_TORQUE_TIME) {
+      if (this.isFlipping) {
         // the flip owns the rotation for a moment
         pitch = this.flipFwd !== 0 ? 0 : pitch;
         roll = this.flipSide !== 0 ? 0 : roll;
+        yaw = 0;
       }
+      if (this.flipLock & 1) pitch = 0;
+      if (this.flipLock & 2) yaw = 0;
       // local angular velocity
       _qi.copy(this.quat).invert();
       const wl = _b.copy(this.angVel).applyQuaternion(_qi);
-      const flipping = this.isFlipping && this.flipTime < FLIP_TORQUE_TIME;
+      const flipping = this.isFlipping;
       // right after a flip, bleed off the leftover spin so the car finishes one clean rotation
       if (this.hasFlipped && !flipping && this.flipTime < FLIP_TORQUE_TIME + 0.35) {
         const damp = Math.exp(-dt * 11);
@@ -550,11 +582,16 @@ export class Car {
       _qi.copy(this.quat).invert();
       const u = _b.set(0, 1, 0).applyQuaternion(_qi); // world up in the car frame
       let err = Math.atan2(u.z, u.y); // roll needed (+ = roll right)
-      if (u.y < -0.7) err = this.autoFlipDir * Math.PI; // upside down: keep the chosen direction
-      if (Math.abs(err) < 0.25 && u.y > 0.9) this.autoFlipTime = 0;
+      let perr = Math.atan2(-u.x, u.y); // pitch needed (+ = nose up)
+      if (u.y < -0.7) {
+        err = this.autoFlipDir * Math.PI; // upside down: keep the chosen direction
+        perr = 0;
+      }
+      if (Math.abs(err) < 0.25 && Math.abs(perr) < 0.25 && u.y > 0.9) this.autoFlipTime = 0;
       else {
         const wl = _c.copy(this.angVel).applyQuaternion(_qi);
         wl.x = Math.max(-9, Math.min(9, err * 7));
+        wl.z = Math.max(-9, Math.min(9, perr * 7));
         this.angVel.copy(wl.applyQuaternion(this.quat));
         righting = true;
       }
@@ -565,7 +602,8 @@ export class Car {
     if (sp > MAX_CAR_SPEED) this.vel.multiplyScalar(MAX_CAR_SPEED / sp);
     // flips may spin faster than normal air control; the cap eases back afterwards
     let angCap = MAX_ANG_SPEED;
-    if (this.hasFlipped && this.flipTime < FLIP_TORQUE_TIME + 0.12) {
+    if (this.isFlipping) angCap = FLIP_ANG_SPEED;
+    else if (this.hasFlipped && this.flipTime < FLIP_TORQUE_TIME + 0.12) {
       const k = Math.max(0, (this.flipTime - FLIP_TORQUE_TIME) / 0.12);
       angCap = FLIP_ANG_SPEED + (MAX_ANG_SPEED - FLIP_ANG_SPEED) * k;
     }
@@ -594,6 +632,13 @@ export class Car {
 
     this.resolveArena();
     this.prevJump = input.jump;
+  }
+
+  /** Close enough above the floor that a flip needs the take-off hop. */
+  private lowFlip() {
+    const p = this.pos;
+    if (arenaSDF(p.x, p.y, p.z) > FLIP_LOW_HEIGHT) return false;
+    return arenaNormal(p.x, p.y, p.z, _lf).y > 0.7;
   }
 
   private startFlip(pitchIn: number, yawIn: number, forwardSpeed: number) {
@@ -627,6 +672,14 @@ export class Car {
     f.normalize();
     const r = _b.set(-f.z, 0, f.x); // right of flattened forward
     this.vel.addScaledVector(f, vx).addScaledVector(r, vy);
+    // Flipping from low down would dig the nose (or tail) into the floor half way round, so
+    // hop just enough to finish the turn in the air and land on the wheels.
+    if (this.lowFlip()) {
+      const h = arenaSDF(this.pos.x, this.pos.y, this.pos.z);
+      // (back and diagonal flips swing the nose / a corner down late in the turn: a bit more air)
+      const T = dx < -0.3 || (Math.abs(dx) > 0.3 && Math.abs(dy) > 0.3) ? FLIP_LOW_AIR_TIME_BACK : FLIP_LOW_AIR_TIME;
+      this.vel.y = (CAR_REST_HEIGHT + 0.03 - h + 0.5 * GRAVITY * T * T) / T;
+    }
     // kick off the rotation immediately
     _c.set(dy * FLIP_ANG_SPEED, 0, -dx * FLIP_ANG_SPEED).applyQuaternion(this.quat);
     this.angVel.copy(_c);
@@ -697,7 +750,8 @@ export class Car {
       (this.isBoosting ? 64 : 0) |
       (this.supersonic ? 128 : 0) |
       (this.demolished ? 256 : 0) |
-      (this.bodyContact ? 512 : 0);
+      (this.bodyContact ? 512 : 0) |
+      ((this.flipLock & 3) << 10);
     a[o++] = this.jumpTime;
     a[o++] = this.airTime;
     a[o++] = this.flipTime;
@@ -734,6 +788,7 @@ export class Car {
     this.supersonic = (f & 128) !== 0;
     this.demolished = (f & 256) !== 0;
     this.bodyContact = (f & 512) !== 0;
+    this.flipLock = (f >> 10) & 3;
     this.jumpTime = a[o++];
     this.airTime = a[o++];
     this.flipTime = a[o++];

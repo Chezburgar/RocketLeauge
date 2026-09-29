@@ -190,6 +190,70 @@ function fresh() {
   for (let i = 0; i < 60; i++) { w.step([inp]); w2.step([inp]); }
   check('deterministic after deserialize', w.cars[0]!.pos.distanceTo(w2.cars[0]!.pos) < 0.01, f(w.cars[0]!.pos) + ' vs ' + f(w2.cars[0]!.pos));
 }
+// 7b. flips with the direction key held the whole time (keyboard: W/S is throttle and pitch)
+for (const [label, pitch, yaw, high] of [
+  ['front', 1, 0, false], ['back', -1, 0, false], ['side', 0, 1, false], ['diagonal', 1, -1, false],
+  ['front (high)', 1, 0, true], ['back (high)', -1, 0, true], ['diagonal (high)', -1, 1, true],
+] as [string, number, number, boolean][]) {
+  for (const speed of [0, 15]) {
+    const { w, car } = fresh();
+    const inp = emptyInput();
+    inp.throttle = 1;
+    inp.boost = speed > 12;
+    for (let i = 0; i < speed * 8; i++) w.step([inp]);
+    inp.boost = false;
+    let bodyHits = 0;
+    let landed = -1;
+    for (let i = 0; i < 300; i++) {
+      const flipAt = high ? 50 : 18;
+      inp.jump = i < (high ? 24 : 10) || (i >= flipAt && i < flipAt + 3);
+      const flipping = i >= flipAt;
+      inp.pitch = flipping ? pitch : 0;
+      inp.yaw = flipping ? yaw : 0;
+      inp.steer = inp.yaw;
+      inp.throttle = flipping && pitch ? pitch : 1;
+      w.step([inp]);
+      if (flipping && landed < 0 && car.bodyContact) bodyHits++;
+      if (flipping && i > flipAt + 5 && landed < 0 && car.onGround) landed = i;
+    }
+    check(`${label} flip @${speed} with keys held lands on wheels`, landed > 0 && car.onGround && car.up(new Vector3()).y > 0.95 && bodyHits === 0, `landed=${landed} up.y=${car.up(new Vector3()).y.toFixed(2)} bodyHits=${bodyHits}`);
+  }
+}
+// 7c. throttle always drives: after coming to a stop the car must not stay stuck at zero
+// (a tiny leftover speed used to be treated as braking every tick)
+{
+  const { w, car } = fresh();
+  const inp = emptyInput();
+  const run = (n: number, f: (i: number) => void) => {
+    for (let i = 0; i < n; i++) {
+      f(i);
+      w.step([inp]);
+    }
+  };
+  const fs = () => car.vel.dot(car.forward(new Vector3()));
+  // side flip with the key held, then forward, then reverse
+  run(60, () => Object.assign(inp, emptyInput()));
+  run(19, (i) => Object.assign(inp, emptyInput(), { throttle: 1, jump: i < 10 || i >= 16, yaw: i >= 16 ? 1 : 0 }));
+  run(180, () => Object.assign(inp, emptyInput(), { yaw: 1, steer: 1 }));
+  run(60, () => Object.assign(inp, emptyInput(), { throttle: 1 }));
+  const fwd = fs();
+  run(120, () => Object.assign(inp, emptyInput(), { throttle: -1 }));
+  const back = fs();
+  run(120, () => Object.assign(inp, emptyInput(), { throttle: 1 }));
+  const again = fs();
+  check('forward / reverse always drive', fwd > 3 && back < -3 && again > 3, `fwd=${fwd.toFixed(1)} back=${back.toFixed(1)} again=${again.toFixed(1)}`);
+}
+// 7d. lying on the roof or side: just holding W gets the car back on its wheels
+for (const [label, roll] of [['roof', Math.PI], ['side', Math.PI / 2]] as [string, number][]) {
+  const { w, car } = fresh();
+  car.quat.setFromAxisAngle(new Vector3(1, 0, 0), roll);
+  car.pos.y = 0.6;
+  const inp = emptyInput();
+  for (let i = 0; i < 90; i++) w.step([inp]);
+  inp.throttle = 1;
+  for (let i = 0; i < 240; i++) w.step([inp]);
+  check('holding W rights the car from its ' + label, car.onGround && car.up(new Vector3()).y > 0.9 && car.vel.length() > 2, 'up.y=' + car.up(new Vector3()).y.toFixed(2) + ' v=' + car.vel.length().toFixed(1));
+}
 // 13b. turtle recovery: upside down and on the side
 for (const [label, roll] of [['roof', Math.PI], ['left side', Math.PI / 2], ['right side', -Math.PI / 2]] as [string, number][]) {
   const { w, car } = fresh();
