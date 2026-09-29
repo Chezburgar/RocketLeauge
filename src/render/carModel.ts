@@ -8,7 +8,7 @@ import { TEAM_SHADES, type BodyId, type Loadout, type TopperId, type WheelId } f
  * Each hull is lofted through a handful of cross-sections (front to back) and mirrored, so the
  * cabin, windscreen and side glass come out of the same surface. Flared arches, side pods,
  * lights and the per-body parts (wings, fins, bumpers…) are added on top. Everything is flat
- * shaded, around 2k triangles per car including wheels.
+ * shaded; about 4k triangles per car, most of them in the wheels.
  *
  * Body space: x forward, y up, z right; y = 0 is 7 cm above the ground.
  */
